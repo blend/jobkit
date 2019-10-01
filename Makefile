@@ -7,7 +7,7 @@ new-install:
 	@go get github.com/blend/go-sdk/cmd/bindata
 
 generate:
-	@go generate github.com/blend/go-sdk/jobkit/...
+	@go generate github.com/blend/jobkit/...
 
 release:
 	@goreleaser release -f .goreleaser/job.yml
