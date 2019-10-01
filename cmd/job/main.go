@@ -17,13 +17,14 @@ import (
 	"github.com/blend/go-sdk/env"
 	"github.com/blend/go-sdk/ex"
 	"github.com/blend/go-sdk/graceful"
-	"github.com/blend/go-sdk/jobkit"
 	"github.com/blend/go-sdk/logger"
 	"github.com/blend/go-sdk/ref"
 	"github.com/blend/go-sdk/sentry"
 	"github.com/blend/go-sdk/slack"
 	"github.com/blend/go-sdk/stats"
 	"github.com/blend/go-sdk/stringutil"
+
+	"github.com/blend/jobkit"
 )
 
 var (

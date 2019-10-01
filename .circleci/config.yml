@@ -1,0 +1,22 @@
+version: 2
+jobs:
+  build:
+    working_directory: /go/src/github.com/blend/jobkit
+    docker:
+      - image: circleci/golang:1.13
+    steps:
+      - checkout
+      - run:
+          name: ci
+          command: make ci
+      - run:
+          name: codecov
+          command: bash <(curl -s https://codecov.io/bash) -X fix -f coverage.txt
+      - store_artifacts:
+          path: coverage.html
+          destination: coverage.html
+workflows:
+  version: 2
+  build:
+    jobs:
+      - build

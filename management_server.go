@@ -22,8 +22,8 @@ import (
 	"github.com/blend/go-sdk/web"
 	"github.com/blend/go-sdk/webutil"
 
-	"github.com/blend/go-sdk/jobkit/static"
-	"github.com/blend/go-sdk/jobkit/views"
+	"github.com/blend/jobkit/static"
+	"github.com/blend/jobkit/views"
 )
 
 // NewServer returns a new management server that lets you
