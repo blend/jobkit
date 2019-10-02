@@ -10,6 +10,8 @@ ci: vet lint profanity cover
 
 new-install:
 	@go get github.com/kardianos/govendor
+	@go get golang.org/x/lint/golint
+	@go get github.com/blend/go-sdk/cmd/coverage
 	@go get github.com/blend/go-sdk/cmd/coverage
 	@go get github.com/blend/go-sdk/cmd/profanity
 	@go get github.com/blend/go-sdk/cmd/bindata
@@ -22,6 +24,18 @@ generate:
 
 release:
 	@goreleaser release -f .goreleaser/job.yml
+
+vet:
+	@echo "$(VERSION)/$(GIT_REF) >> vet"
+	@go vet ./...
+
+lint:
+	@echo "$(VERSION)/$(GIT_REF) >> lint"
+	@golint ./...
+
+profanity:
+	@echo "$(VERSION)/$(GIT_REF) >> profanity"
+	@profanity --rules=PROFANITY_RULES.yml --exclude="_static/*,_views/*" --include="*.go"
 
 test:
 	@echo "$(VERSION)/$(GIT_REF) >> test"

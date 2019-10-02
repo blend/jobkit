@@ -110,7 +110,6 @@ func (djc *defaultJobConfig) Resolve() error {
 			djc.Labels = map[string]string{}
 		}
 		for _, label := range *flagDefaultJobLabels {
-			println("label: ", strings.TrimSpace(label))
 			vars, err := env.Parse(strings.TrimSpace(label))
 			if err != nil {
 				return err

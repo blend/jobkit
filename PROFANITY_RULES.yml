@@ -1,0 +1,26 @@
+GOLANG_LOGGER: #note: this does not affect go-sdk/logger because of the package reference
+  description: "please use `logger.Log`, not a type reference"
+  contains:
+    - "*logger.Logger"
+
+GOLANG_LATCH:
+  description: "please use the latch constructor"
+  contains:
+    - "async.Latch{}"
+
+GOLANG_YAML:
+  description: "please use `github.com/blend/go-sdk/yaml`"
+  importsContain:
+    - "gopkg.in/yaml.v2"
+
+GOLANG_GOPKG_IN:
+  description: "please get specific approval for `gopkg.in` dependencies"
+  importsContain:
+    - "gopkg.in/*"
+
+GOLANG_PRINTLN:
+  description: "please remove debugging `println` statements"
+  excludeFiles:
+    - "examples/*"
+  contains:
+    - "println"

@@ -398,11 +398,11 @@ func (ms ManagementServer) getAPIJobInvocationOutputStream(r *web.Ctx) web.Resul
 		) {
 			contents, _ := json.Marshal(map[string]interface{}{"data": strings.TrimSuffix(line, "\n")})
 			if strings.HasSuffix(line, "\n") {
-				if err := es.EventData("println", string(contents)); err != nil {
+				if err := es.EventData("writeln", string(contents)); err != nil {
 					logger.MaybeError(log, err)
 				}
 			} else {
-				if err := es.EventData("print", string(contents)); err != nil {
+				if err := es.EventData("write", string(contents)); err != nil {
 					logger.MaybeError(log, err)
 				}
 			}
