@@ -6,9 +6,15 @@ all: static
 
 deploy: generate build release
 
-ci: vet lint profanity cover
+ci: new-install vet lint profanity cover
 
-new-install:
+new-install: dev-deps deps
+
+deps:
+	@echo "$(VERSION)/$(GIT_REF) >> fetching dependencies"
+	@go get ./...
+
+dev-deps:
 	@go get github.com/kardianos/govendor
 	@go get golang.org/x/lint/golint
 	@go get github.com/blend/go-sdk/cmd/coverage
