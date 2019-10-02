@@ -8,8 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/blend/go-sdk/ansi"
-	"github.com/blend/go-sdk/aws"
-	"github.com/blend/go-sdk/aws/ses"
 	"github.com/blend/go-sdk/configutil"
 	"github.com/blend/go-sdk/cron"
 	"github.com/blend/go-sdk/datadog"
@@ -220,10 +218,7 @@ func run(cmd *cobra.Command, args []string) error {
 
 	// set up myriad of notification targets
 	var emailClient email.Sender
-	if !cfg.AWS.IsZero() {
-		emailClient = ses.New(aws.MustNewSession(cfg.AWS))
-		log.Infof("adding ses email notifications")
-	} else if !cfg.SMTP.IsZero() {
+	if !cfg.SMTP.IsZero() {
 		emailClient = cfg.SMTP
 		log.Infof("adding smtp email notifications")
 	}

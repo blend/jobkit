@@ -1,7 +1,6 @@
 package jobkit
 
 import (
-	"github.com/blend/go-sdk/aws"
 	"github.com/blend/go-sdk/configutil"
 	"github.com/blend/go-sdk/datadog"
 	"github.com/blend/go-sdk/email"
@@ -26,8 +25,6 @@ type Config struct {
 	Logger logger.Config `yaml:"logger"`
 	// Web is the web config used for the management server.
 	Web web.Config `yaml:"web"`
-	// AWS is used by aws options like SES.
-	AWS aws.Config `yaml:"aws"`
 	// SMTP is the smtp options.
 	SMTP email.SMTPSender `yaml:"smtp"`
 	// Datadog configures the datadog client.
@@ -43,7 +40,6 @@ func (c *Config) Resolve() error {
 	return configutil.AnyError(
 		c.Logger.Resolve(),
 		c.Web.Resolve(),
-		c.AWS.Resolve(),
 		c.EmailDefaults.Resolve(),
 		c.Datadog.Resolve(),
 		c.Slack.Resolve(),

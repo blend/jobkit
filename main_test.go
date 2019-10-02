@@ -13,6 +13,10 @@ import (
 	"github.com/blend/go-sdk/web"
 )
 
+func createTimestamp(adjustBy time.Duration) time.Time {
+	return time.Date(2019, 10, 01, 12, 11, 10, 9, time.UTC).Add(adjustBy)
+}
+
 func firstJob(jm *cron.JobManager) *cron.JobScheduler {
 	sorted := sortedJobs(jm)
 	if len(sorted) > 0 {
@@ -31,9 +35,9 @@ func sortedJobs(jm *cron.JobManager) []*cron.JobScheduler {
 	return output
 }
 
-func createTestBufferChunk() bufferutil.BufferChunk {
+func createTestBufferChunk(index int) bufferutil.BufferChunk {
 	return bufferutil.BufferChunk{
-		Timestamp: time.Now().UTC(),
+		Timestamp: createTimestamp(time.Duration(index) * time.Second),
 		Data:      []byte(uuid.V4()),
 	}
 }
@@ -48,11 +52,11 @@ func createTestCompleteJobInvocation(jobName string, elapsed time.Duration) cron
 		Elapsed:  elapsed,
 		Output: &bufferutil.Buffer{
 			Chunks: []bufferutil.BufferChunk{
-				createTestBufferChunk(),
-				createTestBufferChunk(),
-				createTestBufferChunk(),
-				createTestBufferChunk(),
-				createTestBufferChunk(),
+				createTestBufferChunk(0),
+				createTestBufferChunk(1),
+				createTestBufferChunk(2),
+				createTestBufferChunk(3),
+				createTestBufferChunk(4),
 			},
 		},
 	}
@@ -69,8 +73,8 @@ func createTestFailedJobInvocation(jobName string, elapsed time.Duration, err er
 		Err:      err,
 		Output: &bufferutil.Buffer{
 			Chunks: []bufferutil.BufferChunk{
-				createTestBufferChunk(),
-				createTestBufferChunk(),
+				createTestBufferChunk(0),
+				createTestBufferChunk(1),
 			},
 		},
 	}
@@ -86,10 +90,10 @@ func createTestJobManager() *cron.JobManager {
 
 	test0CurrentOutput := &bufferutil.Buffer{
 		Chunks: []bufferutil.BufferChunk{
-			createTestBufferChunk(),
-			createTestBufferChunk(),
-			createTestBufferChunk(),
-			createTestBufferChunk(),
+			createTestBufferChunk(0),
+			createTestBufferChunk(1),
+			createTestBufferChunk(2),
+			createTestBufferChunk(3),
 		},
 	}
 	test0CurrentBufferHandlers := new(bufferutil.BufferHandlers)

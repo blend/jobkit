@@ -14,12 +14,19 @@ new-install:
 	@go get github.com/blend/go-sdk/cmd/profanity
 	@go get github.com/blend/go-sdk/cmd/bindata
 
+install:
+	@go install github.com/blend/jobkit/cmd/job
+
 generate:
 	@go generate github.com/blend/jobkit/...
 
 release:
 	@goreleaser release -f .goreleaser/job.yml
 
+test:
+	@echo "$(VERSION)/$(GIT_REF) >> test"
+	@go test ./... -timeout 10s
+
 cover:
 	@echo "$(VERSION)/$(GIT_REF) >> coverage"
-	@coverage ./...
+	@coverage
