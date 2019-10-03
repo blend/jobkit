@@ -49,4 +49,4 @@ test:
 
 cover:
 	@echo "$(VERSION)/$(GIT_REF) >> coverage"
-	@coverage
+	@coverage -race
