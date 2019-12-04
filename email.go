@@ -17,8 +17,10 @@ func NewEmailMessage(flag string, emailDefaults email.Message, ji *cron.JobInvoc
 		"flag":    flag,
 		"jobName": ji.JobName,
 		"state":   ji.State,
-		"elapsed": ji.Elapsed,
 		"err":     ji.Err,
+	}
+	if ji.Elapsed > 0 {
+		vars["elapsed"] = ji.Elapsed.String()
 	}
 	if ji.Output != nil && len(ji.Output.Chunks) > 0 {
 		vars["output"] = ji.Output.String()
@@ -46,7 +48,7 @@ const (
 	DefaultEmailMimeType = "text/plain"
 
 	// DefaultEmailSubjectTemplate is the default subject template.
-	DefaultEmailSubjectTemplate = `{{.Var "jobName" }} :: {{ .Var "flag" }}`
+	DefaultEmailSubjectTemplate = `{{.Var "jobName" }} :: {{ .Var "flag" }}{{ if .HasVar "elapsed" }} ({{ .Var "elapsed" }} elapsed){{end}}`
 
 	// DefaultEmailHTMLBodyTemplate is the default email html body template.
 	DefaultEmailHTMLBodyTemplate = `
@@ -67,6 +69,9 @@ const (
 </head>
 <body class="email-body">
 	<h3>{{ .Var "jobName" }} {{ .Var "state" "Unknown" }}</h3>
+	{{ if .HasVar "elapsed" }}
+	<div class="email-elapsed"><h4>Elapsed</h4><div>{{ .Var "elapsed" }}</div></div>
+	{{ end }}
 	<div class="email-details">
 	{{ if .Var "err" }}
 	<h4>Error</h4>
@@ -83,7 +88,9 @@ const (
 
 	// DefaultEmailTextBodyTemplate is the default body template.
 	DefaultEmailTextBodyTemplate = `{{ .Var "jobName" }} {{ .Var "state" }}
+{{ if .HasVar "elapsed" }}
 Elapsed: {{ .Var "elapsed" }}
+{{ end }}
 {{ if .HasVar "err" }}Error: {{ .Var "err" }}{{end}}
 {{ if .HasVar "output" }}Output:
 {{ .Var "output" }}{{end}}

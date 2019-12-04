@@ -112,7 +112,7 @@ func OptConfig(cfg JobConfig) JobOption {
 	return func(job *Job) error {
 		job.Config = cfg
 		job.EmailDefaults = cfg.EmailDefaults
-		job.WebhookDefaults = cfg.Webhook
+		job.WebhookDefaults = cfg.WebhookDefaults
 		return nil
 	}
 }
@@ -232,7 +232,7 @@ func (job Job) OnDisabled(ctx context.Context) {
 }
 
 // PersistHistory writes the history to disk.
-// It does so completely.
+// It does so completely, overwriting any existing history file on disk with the complete history.
 func (job Job) PersistHistory(ctx context.Context, log []cron.JobInvocation) error {
 	historyDirectory := job.Config.HistoryPathOrDefault()
 	if _, err := os.Stat(historyDirectory); err != nil {
@@ -249,7 +249,7 @@ func (job Job) PersistHistory(ctx context.Context, log []cron.JobInvocation) err
 	return json.NewEncoder(f).Encode(log)
 }
 
-// RestoreHistory restores history from disc.
+// RestoreHistory restores history from disk.
 func (job Job) RestoreHistory(ctx context.Context) (output []cron.JobInvocation, err error) {
 	historyPath := filepath.Join(job.Config.HistoryPathOrDefault(), stringutil.Slugify(job.Name())+".json")
 	if _, statErr := os.Stat(historyPath); statErr != nil {

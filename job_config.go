@@ -10,6 +10,10 @@ import (
 // You can use this job config by embedding it into your larger job config struct.
 type JobConfig struct {
 	cron.JobConfig `yaml:",inline"`
+
+	// Parameters are optional inputs for jobs.
+	Parameters []Parameter `yaml:"parameters"`
+
 	// Schedule returns the job schedule.
 	Schedule string `yaml:"schedule"`
 	// HistoryPath is the base path we should write job history to.
@@ -18,9 +22,8 @@ type JobConfig struct {
 
 	// EmailDefaults holds the message defaults for email notifications.
 	EmailDefaults email.Message `yaml:"emailDefaults"`
-
-	// Webhook set a webhook target for notifications.
-	Webhook Webhook `yaml:"webhook"`
+	// WebhookDefaults set a webhook target for notifications.
+	WebhookDefaults Webhook `yaml:"webhookDefaults"`
 
 	// NotifyOnStart governs if we should send notifications job start.
 	NotifyOnStart *bool `yaml:"notifyOnStart"`

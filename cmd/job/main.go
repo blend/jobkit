@@ -269,7 +269,6 @@ func run(cmd *cobra.Command, args []string) error {
 
 		enabled := ansi.ColorGreen.Apply("enabled")
 		disabled := ansi.ColorRed.Apply("disabled")
-
 		log.Infof("loading job `%s` with exec: %s", jobCfg.Name, ansi.ColorLightWhite.Apply(strings.Join(jobCfg.Exec, " ")))
 		log.Infof("loading job `%s` with schedule: %s", jobCfg.Name, ansi.ColorLightWhite.Apply(jobCfg.ScheduleOrDefault()))
 		if !jobCfg.HistoryDisabledOrDefault() && !jobCfg.HistoryPersistenceDisabledOrDefault() {
@@ -337,5 +336,6 @@ func createJobFromConfig(base config, cfg jobConfig) (*jobkit.Job, error) {
 		job.Config.Description = strings.Join(cfg.Exec, " ")
 	}
 	job.EmailDefaults = email.MergeMessages(base.EmailDefaults, cfg.EmailDefaults)
+	job.WebhookDefaults = cfg.WebhookDefaults
 	return job, nil
 }

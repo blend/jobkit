@@ -2,6 +2,7 @@ package jobkit
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -77,6 +78,7 @@ func (ms ManagementServer) Register(app *web.App) {
 
 	// job routes
 	app.GET("/job/:jobName", ms.getJob)
+	app.GET("/job.parameters/:jobName", ms.getJobParameters)
 	app.GET("/job.run/:jobName", ms.getJobRun)
 	app.GET("/job.enable/:jobName", ms.getJobEnable)
 	app.GET("/job.disable/:jobName", ms.getJobDisable)
@@ -91,6 +93,7 @@ func (ms ManagementServer) Register(app *web.App) {
 	app.GET("/api/jobs", ms.getAPIJobs)
 	app.GET("/api/jobs.running", ms.getAPIJobsRunning)
 	app.GET("/api/job/:jobName", ms.getAPIJob)
+	app.GET("/api/job.parameters/:jobName", ms.getAPIJobParameters)
 	app.POST("/api/job.run/:jobName", ms.postAPIJobRun)
 	app.POST("/api/job.cancel/:jobName", ms.postAPIJobCancel)
 	app.POST("/api/job.disable/:jobName", ms.postAPIJobDisable)
@@ -108,6 +111,7 @@ func (ms ManagementServer) ViewPaths() []string {
 		"_views/index.html",
 		"_views/job.html",
 		"_views/invocation.html",
+		"_views/parameters.html",
 		"_views/partials/job_table.html",
 		"_views/partials/job_row.html",
 	}
@@ -190,6 +194,15 @@ func (ms ManagementServer) getJob(r *web.Ctx) web.Result {
 		return result
 	}
 	return r.Views.View("job", job)
+}
+
+// getJobParameters is mapped to GET /job.parameters/:jobName
+func (ms ManagementServer) getJobParameters(r *web.Ctx) web.Result {
+	jobScheduler, result := ms.getRequestJob(r, web.JSON)
+	if result != nil {
+		return result
+	}
+	return r.Views.View("parameters", jobScheduler.Job.(*Job).Config.Parameters)
 }
 
 // getJobRun is mapped to GET /job.run/:jobName
@@ -286,17 +299,33 @@ func (ms ManagementServer) getAPIJob(r *web.Ctx) web.Result {
 	return web.JSON.Result(job.Status())
 }
 
+// getAPIJobParameters is mapped to GET /api/job.parameters/:jobName
+func (ms ManagementServer) getAPIJobParameters(r *web.Ctx) web.Result {
+	job, result := ms.getRequestJob(r, web.JSON)
+	if result != nil {
+		return result
+	}
+	return web.JSON.Result(job.Job.(*Job).Config.Parameters)
+}
+
 // postAPIJobRun is mapped to POST /api/job.run/:jobName
 func (ms ManagementServer) postAPIJobRun(r *web.Ctx) web.Result {
 	job, result := ms.getRequestJob(r, web.JSON)
 	if result != nil {
 		return result
 	}
-	ji, err := ms.Cron.RunJob(job.Name())
+	ji, err := ms.Cron.RunJobContext(WithParameters(context.Background(), ms.jobParams(r, job)...), job.Name())
 	if err != nil {
 		return web.JSON.BadRequest(err)
 	}
 	return web.JSON.Result(ji)
+}
+
+func (ms ManagementServer) jobParams(r *web.Ctx, job *cron.JobScheduler) []Parameter {
+	params := job.Job.(*Job).Config.Parameters
+	for key, value := range r.Form {
+		params
+	}
 }
 
 // postAPIJobCancel is mapped to POST /api/job.cancel/:jobName

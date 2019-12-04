@@ -29,7 +29,7 @@ func TestNewEmailMessage(t *testing.T) {
 		email.OptCC("baileydog@blend.com"),
 	)
 	assert.Nil(err)
-	assert.Equal("test :: cron.complete", message.Subject)
+	assert.Equal("test :: cron.complete (1ms elapsed)", message.Subject)
 	assert.NotEmpty(message.From)
 	assert.Equal("jobkit@blend.com", message.From)
 	assert.NotEmpty(message.To)
@@ -39,7 +39,9 @@ func TestNewEmailMessage(t *testing.T) {
 	assert.NotEmpty(message.HTMLBody)
 	assert.Contains(message.HTMLBody, "this is a test")
 	assert.Contains(message.HTMLBody, "this is another test")
+	assert.Contains(message.HTMLBody, "1ms")
 	assert.NotEmpty(message.TextBody)
 	assert.Contains(message.TextBody, "this is a test")
 	assert.Contains(message.TextBody, "this is another test")
+	assert.Contains(message.TextBody, "1ms")
 }

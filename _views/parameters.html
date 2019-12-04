@@ -1,0 +1,33 @@
+{{ define "parameters" }}
+{{ template "header" . }}
+<div id="content" class="uk-container uk-container-expand">
+	<div class="uk-child-width-expand@s" uk-grid>
+		<div>
+			<ul class="uk-breadcrumb">
+				<li><a href="/">Jobs</a></li>
+				<li><a href="/job/{{ .ViewModel.Name | urlencode }}">{{ .ViewModel.Name }}</a></li>
+				<li>Parameters</li>
+			</ul>
+		</div>
+	</div>
+	<div class="uk-grid uk-grid-divider uk-grid-medium uk-child-width-1-1">
+		<div>
+			<span class="uk-text-small">Parameters</span>
+		</div>
+		<form action="/job.run/{{ .ViewModel.Name | urlencode }}">
+		{{ range $index, $param := .ViewModel }}
+			<div>
+				{{ $param.RenderInputLabel }}
+				<div class="form-input">
+				{{ $param.RenderInput }}
+				</div>
+			</div>
+		{{ else }}
+			<div>Job has no parameters</div>
+		{{ end }}
+		<input type="submit">Run Job</form>
+		</form>
+	</div>
+</div>
+{{ template "footer" . }}
+{{ end }}
