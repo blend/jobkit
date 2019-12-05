@@ -1,0 +1,21 @@
+title: "Example Job Manager"
+
+web:
+  bindAddr: ":8080"
+
+logger:
+  flags: [ "all" ]
+
+jobs:
+  - name: "hello world"
+    labels:
+      kind: "parameterized"
+      team: "bailey"
+    schedule: "*/10 * * * *"
+    serial: true
+    parameters:
+    - name: "MESSAGE"
+      placeholder: "put a message here"
+      required: true
+    exec:
+    - "echo ${MESSAGE}!"
