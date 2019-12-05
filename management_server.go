@@ -13,12 +13,11 @@ import (
 	"time"
 
 	"github.com/blend/go-sdk/bufferutil"
-	"github.com/blend/go-sdk/stringutil"
-
 	"github.com/blend/go-sdk/cron"
 	"github.com/blend/go-sdk/ex"
 	"github.com/blend/go-sdk/logger"
 	"github.com/blend/go-sdk/selector"
+	"github.com/blend/go-sdk/stringutil"
 	"github.com/blend/go-sdk/uuid"
 	"github.com/blend/go-sdk/web"
 	"github.com/blend/go-sdk/webutil"
@@ -52,7 +51,7 @@ func (ms ManagementServer) Register(app *web.App) {
 		for _, viewPath := range ms.ViewPaths() {
 			vf, err := views.GetBinaryAsset(viewPath)
 			if err != nil {
-				panic(err)
+				panic(ex.New(err, ex.OptMessagef("view path: %s", viewPath)))
 			}
 			contents, err := vf.Contents()
 			if err != nil {
@@ -211,7 +210,12 @@ func (ms ManagementServer) getJobRun(r *web.Ctx) web.Result {
 	if result != nil {
 		return result
 	}
-	ji, err := ms.Cron.RunJob(job.Name())
+
+	if err := r.Request.ParseForm(); err != nil {
+		return r.Views.BadRequest(err)
+	}
+
+	ji, err := ms.Cron.RunJobContext(WithParameterValues(context.Background(), ParameterValuesFromForm(r.Request.Form)), job.Name())
 	if err != nil {
 		return r.Views.BadRequest(err)
 	}
@@ -314,18 +318,26 @@ func (ms ManagementServer) postAPIJobRun(r *web.Ctx) web.Result {
 	if result != nil {
 		return result
 	}
-	ji, err := ms.Cron.RunJobContext(WithParameters(context.Background(), ms.jobParams(r, job)...), job.Name())
+
+	// handle the parameters
+	body, err := r.PostBody()
+	if err != nil {
+		return web.JSON.BadRequest(err)
+	}
+
+	var params ParameterValues
+	if len(body) > 0 {
+		params, err = ParameterValuesFromJSON(body)
+		if err != nil {
+			return web.JSON.BadRequest(err)
+		}
+	}
+
+	ji, err := ms.Cron.RunJobContext(WithParameterValues(context.Background(), params), job.Name())
 	if err != nil {
 		return web.JSON.BadRequest(err)
 	}
 	return web.JSON.Result(ji)
-}
-
-func (ms ManagementServer) jobParams(r *web.Ctx, job *cron.JobScheduler) []Parameter {
-	params := job.Job.(*Job).Config.Parameters
-	for key, value := range r.Form {
-		params
-	}
 }
 
 // postAPIJobCancel is mapped to POST /api/job.cancel/:jobName
