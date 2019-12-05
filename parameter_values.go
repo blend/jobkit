@@ -8,8 +8,12 @@ import (
 )
 
 // ParameterValuesFromForm creates a parameter values set from url values.
-func ParameterValuesFromForm(formValues url.Values) cron.JobParameters {
+func ParameterValuesFromForm(parameters []Parameter, formValues url.Values) cron.JobParameters {
 	output := make(cron.JobParameters)
+	for _, param := range parameters {
+		output[param.Name] = param.Value
+	}
+
 	for key, values := range formValues {
 		if len(values) == 0 {
 			output[key] = ""
@@ -21,8 +25,12 @@ func ParameterValuesFromForm(formValues url.Values) cron.JobParameters {
 }
 
 // ParameterValuesFromJSON creates a parameter values set from json data.
-func ParameterValuesFromJSON(data []byte) (cron.JobParameters, error) {
+func ParameterValuesFromJSON(parameters []Parameter, data []byte) (cron.JobParameters, error) {
 	output := make(cron.JobParameters)
+	for _, param := range parameters {
+		output[param.Name] = param.Value
+	}
+
 	if err := json.Unmarshal(data, &output); err != nil {
 		return nil, err
 	}

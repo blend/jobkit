@@ -284,10 +284,15 @@ func TestJobHistoryProvider(t *testing.T) {
 	assert.Nil(err)
 	defer os.RemoveAll(tmpdir)
 
-	job := &Job{
-		Config: JobConfig{
-			HistoryPath: tmpdir,
+	cfg := JobConfig{
+		JobConfig: cron.JobConfig{
+			Name: "gosdk_jobkit",
 		},
+		HistoryPath: tmpdir,
+	}
+	job := &Job{
+		Config:  cfg,
+		History: HistoryJSON{Config: cfg},
 	}
 
 	history := []cron.JobInvocation{

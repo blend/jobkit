@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/blend/go-sdk/bufferutil"
+	"github.com/blend/go-sdk/logger"
 	"github.com/blend/go-sdk/r2"
 
 	"github.com/blend/go-sdk/assert"
@@ -223,6 +224,7 @@ func TestManagementServerJobRun(t *testing.T) {
 	assert := assert.New(t)
 
 	jm, app := createTestManagementServer()
+	app.Log = logger.All()
 
 	job, err := jm.Job("test1")
 	assert.Nil(err)

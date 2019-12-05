@@ -213,8 +213,9 @@ func (ms ManagementServer) getJobParameters(r *web.Ctx) web.Result {
 	}
 	job, ok := jobScheduler.Job.(*Job)
 	if !ok {
-		return r.Views.InternalError(ex.New("job is not a jobkit job; cannot fetch parameters"))
+		return web.Redirect("/job.run/" + jobScheduler.Name())
 	}
+
 	parameters := job.Config.Parameters
 	if len(parameters) == 0 {
 		return web.Redirect("/job.run/" + jobScheduler.Name())
@@ -224,16 +225,25 @@ func (ms ManagementServer) getJobParameters(r *web.Ctx) web.Result {
 
 // getJobRun is mapped to GET /job.run/:jobName
 func (ms ManagementServer) getJobRun(r *web.Ctx) web.Result {
-	job, result := ms.getRequestJob(r, web.JSON)
+	jobScheduler, result := ms.getRequestJob(r, web.JSON)
 	if result != nil {
 		return result
 	}
+	job, ok := jobScheduler.Job.(*Job)
+	if !ok {
+		ji, err := jobScheduler.RunAsyncContext(context.Background())
+		if err != nil {
+			return r.Views.BadRequest(err)
+		}
+		return web.RedirectWithMethodf("GET", "/job.invocation/%s/%s", url.QueryEscape(jobScheduler.Name()), ji.ID)
+	}
+
 	if err := r.Request.ParseForm(); err != nil {
 		return r.Views.BadRequest(err)
 	}
-	parameters := ParameterValuesFromForm(r.Request.Form)
-
-	ji, err := job.RunAsyncContext(cron.WithJobParameters(context.Background(), parameters))
+	parameters := job.Config.Parameters
+	parameterValues := ParameterValuesFromForm(parameters, r.Request.Form)
+	ji, err := jobScheduler.RunAsyncContext(cron.WithJobParameters(context.Background(), parameterValues))
 	if err != nil {
 		return r.Views.BadRequest(err)
 	}
@@ -332,25 +342,32 @@ func (ms ManagementServer) getAPIJobParameters(r *web.Ctx) web.Result {
 
 // postAPIJobRun is mapped to POST /api/job.run/:jobName
 func (ms ManagementServer) postAPIJobRun(r *web.Ctx) web.Result {
-	job, result := ms.getRequestJob(r, web.JSON)
+	jobScheduler, result := ms.getRequestJob(r, web.JSON)
 	if result != nil {
 		return result
 	}
 
-	// handle the parameters
+	job, ok := jobScheduler.Job.(*Job)
+	if !ok {
+		ji, err := jobScheduler.RunAsync()
+		if err != nil {
+			return web.JSON.BadRequest(err)
+		}
+		return web.JSON.Result(ji)
+	}
+
+	parameters := job.Config.Parameters
 	body, err := r.PostBody()
 	if err != nil {
 		return web.JSON.BadRequest(err)
 	}
-
 	var params cron.JobParameters
 	if len(body) > 0 {
-		params, err = ParameterValuesFromJSON(body)
+		params, err = ParameterValuesFromJSON(parameters, body)
 		if err != nil {
 			return web.JSON.BadRequest(err)
 		}
 	}
-
 	ji, err := ms.Cron.RunJobContext(cron.WithJobParameters(context.Background(), params), job.Name())
 	if err != nil {
 		return web.JSON.BadRequest(err)
