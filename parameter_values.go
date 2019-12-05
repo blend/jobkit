@@ -1,14 +1,15 @@
 package jobkit
 
 import (
-	"context"
 	"encoding/json"
 	"net/url"
+
+	"github.com/blend/go-sdk/cron"
 )
 
 // ParameterValuesFromForm creates a parameter values set from url values.
-func ParameterValuesFromForm(formValues url.Values) ParameterValues {
-	output := make(ParameterValues)
+func ParameterValuesFromForm(formValues url.Values) cron.JobParameters {
+	output := make(cron.JobParameters)
 	for key, values := range formValues {
 		if len(values) == 0 {
 			output[key] = ""
@@ -20,30 +21,18 @@ func ParameterValuesFromForm(formValues url.Values) ParameterValues {
 }
 
 // ParameterValuesFromJSON creates a parameter values set from json data.
-func ParameterValuesFromJSON(data []byte) (ParameterValues, error) {
-	output := make(ParameterValues)
+func ParameterValuesFromJSON(data []byte) (cron.JobParameters, error) {
+	output := make(cron.JobParameters)
 	if err := json.Unmarshal(data, &output); err != nil {
 		return nil, err
 	}
 	return output, nil
 }
 
-// ParameterValues is a loose association to map[string]string.
-type ParameterValues = map[string]string
-
-type contextKeyParameters struct{}
-
-// WithParameterValues adds job invocation parameter values to a context.
-func WithParameterValues(ctx context.Context, values ParameterValues) context.Context {
-	return context.WithValue(ctx, contextKeyParameters{}, values)
-}
-
-// GetParameterValues gets parameter values from a given context.
-func GetParameterValues(ctx context.Context) ParameterValues {
-	if value := ctx.Value(contextKeyParameters{}); value != nil {
-		if typed, ok := value.(ParameterValues); ok {
-			return typed
-		}
+// ParameterValuesAsEnviron returns params as environment values, i.e. key=value.
+func ParameterValuesAsEnviron(params cron.JobParameters) (environ []string) {
+	for key, value := range params {
+		environ = append(environ, key+"="+value)
 	}
-	return nil
+	return
 }

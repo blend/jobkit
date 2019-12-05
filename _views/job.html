@@ -63,10 +63,10 @@
         </div>
 		<div>
             <span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="history"></span>History Persistence</span>
-            {{ if .ViewModel.Status.HistoryPersistenceDisabled }}
-            <h3 class="uk-text-danger">Disabled</h3>
-            {{ else }}
+            {{ if .ViewModel.Status.HistoryPersistenceEnabled }}
             <h3 class="uk-text-primary">Enabled</h3>
+            {{ else }}
+            <h3 class="uk-text-danger">Disabled</h3>
             {{ end }}
         </div>
 		<div>
@@ -98,6 +98,7 @@
 			<tr>
 				<th>Started</th>
 				<th>Finished</th>
+				<th>Parameters</th>
 				<th>Status</th>
 				<th>Elapsed</th>
 				<th>Error</th>
@@ -109,6 +110,7 @@
 			<tr>
 				<td class="uk-table-shrink">{{ .ViewModel.Current.Started | rfc3339 }}</td>
 				<td class="uk-table-shrink">{{ if .ViewModel.Current.Finished.IsZero }}-{{ else }}{{ .ViewModel.Current.Finished | rfc3339 }}{{ end }}</td>
+				<td class="uk-table-shrink">{{ .ViewModel.Current.Parameters }}</td>
 				<td class="uk-table-shrink">{{ .ViewModel.Current.State }}</td>
 				<td class="uk-table-shrink">{{ if .ViewModel.Current.Finished.IsZero}}{{ .ViewModel.Current.Started | since_utc | duration_round_millis }}{{ else }}{{.ViewModel.Current.Elapsed | duration_round_millis }}{{end}}</td>
 				<td class="uk-table-expand uk-text-truncate">{{ if .ViewModel.Current.Err }}<code>{{ .ViewModel.Current.Err }}</code>{{ else }}-{{end}}</td>
@@ -119,6 +121,7 @@
 			<tr>
 				<td class="uk-table-shrink">{{ $ji.Started | rfc3339 }}</td>
 				<td class="uk-table-shrink">{{ if $ji.Finished.IsZero }}-{{ else }}{{ $ji.Finished | rfc3339 }}{{ end }}</td>
+				<td class="uk-table-shrink">{{ $ji.Parameters | format_environ }}</td>
 				<td class="uk-table-shrink">{{ $ji.State }}</td>
 				<td class="uk-table-shrink">{{ $ji.Elapsed }}</td>
 				<td class="uk-table-expand uk-text-truncate">{{ if $ji.Err }}{{ $ji.Err }}{{ else }}-{{end}}</td>

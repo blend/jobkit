@@ -50,3 +50,6 @@ test:
 cover:
 	@echo "$(VERSION)/$(GIT_REF) >> coverage"
 	@coverage -race
+
+run:
+	@go run cmd/job/main.go -c=_examples/jobs.yml --use-view-files=true

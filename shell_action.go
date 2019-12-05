@@ -43,22 +43,40 @@ func ShellAction(exec []string, opts ...ShellActionOption) func(context.Context)
 		if ji == nil || ji.Output == nil {
 			return fmt.Errorf("shell action; invocation meta required with the output set")
 		}
+
+		localExec := make([]string, len(exec))
+		copy(localExec, exec)
+
 		if !options.SkipExpandEnv {
-			for index, arg := range exec {
+			for index, arg := range localExec {
 				if index == 0 {
 					continue
 				}
-				exec[index] = os.ExpandEnv(arg)
+				localExec[index] = os.Expand(arg, CreateParameterExpand(ji))
 			}
 		}
-		cmd, err := sh.CmdContext(ctx, exec[0], exec[1:]...)
+
+		cmd, err := sh.CmdContext(ctx, localExec[0], localExec[1:]...)
 		if err != nil {
 			return err
 		}
+		cmd.Env = append(os.Environ(), ParameterValuesAsEnviron(ji.Parameters)...)
 		if !options.DiscardOutput {
 			cmd.Stdout = io.MultiWriter(ji.Output, os.Stdout)
 			cmd.Stderr = io.MultiWriter(ji.Output, os.Stderr)
 		}
 		return ex.New(cmd.Run())
+	}
+}
+
+// CreateParameterExpand returns a new parameter expander for a given job invocation.
+func CreateParameterExpand(ji *cron.JobInvocation) func(string) string {
+	return func(name string) string {
+		if ji.Parameters != nil {
+			if value, ok := ji.Parameters[name]; ok {
+				return value
+			}
+		}
+		return os.Getenv(name)
 	}
 }

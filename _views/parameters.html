@@ -6,26 +6,23 @@
 			<ul class="uk-breadcrumb">
 				<li><a href="/">Jobs</a></li>
 				<li><a href="/job/{{ .ViewModel.Name | urlencode }}">{{ .ViewModel.Name }}</a></li>
-				<li>Parameters</li>
+				<li>Run With Parameters</li>
 			</ul>
 		</div>
 	</div>
-	<div class="uk-grid uk-grid-divider uk-grid-medium uk-child-width-1-1">
-		<div>
-			<span class="uk-text-small">Parameters</span>
-		</div>
-		<form action="/job.run/{{ .ViewModel.Name | urlencode }}">
-		{{ range $index, $param := .ViewModel }}
+	<div class="uk-grid uk-grid-divider uk-grid-small uk-child-width-1-1">
+		<form action="/job.run/{{ .ViewModel.Name | urlencode }}" class="uk-form-horizontal">
+		{{ range $index, $param := .ViewModel.Config.Parameters }}
 			<div>
-				{{ $param.RenderInputLabel }}
-				<div class="form-input">
-				{{ $param.RenderInput }}
+				{{ $param.RenderLabel "class='uk-form-label'" }}
+				<div class="uk-form-controls">
+				{{ $param.RenderInput "class='uk-input'" }}
 				</div>
 			</div>
 		{{ else }}
 			<div>Job has no parameters</div>
 		{{ end }}
-		<input type="submit">Run Job</form>
+		<input type="submit" value="Run Job"/>
 		</form>
 	</div>
 </div>

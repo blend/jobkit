@@ -2,14 +2,10 @@ package jobkit
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/blend/go-sdk/cron"
 	"github.com/blend/go-sdk/email"
-	"github.com/blend/go-sdk/ex"
 	"github.com/blend/go-sdk/logger"
 	"github.com/blend/go-sdk/ref"
 	"github.com/blend/go-sdk/sentry"
@@ -49,6 +45,7 @@ func NewJob(cfg JobConfig, action func(context.Context) error, options ...JobOpt
 			return nil, err
 		}
 	}
+	job.History = HistoryJSON{cfg}
 	return &job, nil
 }
 
@@ -81,8 +78,8 @@ func Wrap(job cron.Job) *Job {
 	if typed, ok := job.(cron.HistoryDisabledProvider); ok {
 		j.Config.HistoryDisabled = ref.Bool(typed.HistoryDisabled())
 	}
-	if typed, ok := job.(cron.HistoryPersistenceDisabledProvider); ok {
-		j.Config.HistoryPersistenceDisabled = ref.Bool(typed.HistoryPersistenceDisabled())
+	if typed, ok := job.(cron.HistoryPersistenceEnabledProvider); ok {
+		j.Config.HistoryPersistenceEnabled = ref.Bool(typed.HistoryPersistenceEnabled())
 	}
 	if typed, ok := job.(cron.HistoryMaxCountProvider); ok {
 		j.Config.HistoryMaxCount = typed.HistoryMaxCount()
@@ -147,6 +144,8 @@ type Job struct {
 	SlackClient  slack.Sender
 	SentryClient sentry.Sender
 	EmailClient  email.Sender
+
+	History cron.HistoryProvider
 }
 
 // Name returns the job name.
@@ -234,34 +233,18 @@ func (job Job) OnDisabled(ctx context.Context) {
 // PersistHistory writes the history to disk.
 // It does so completely, overwriting any existing history file on disk with the complete history.
 func (job Job) PersistHistory(ctx context.Context, log []cron.JobInvocation) error {
-	historyDirectory := job.Config.HistoryPathOrDefault()
-	if _, err := os.Stat(historyDirectory); err != nil {
-		if err := os.MkdirAll(historyDirectory, 0755); err != nil {
-			return ex.New(err)
-		}
+	if job.History != nil {
+		return job.History.PersistHistory(ctx, log)
 	}
-	historyPath := filepath.Join(historyDirectory, stringutil.Slugify(job.Name())+".json")
-	f, err := os.Create(historyPath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	return json.NewEncoder(f).Encode(log)
+	return nil
 }
 
 // RestoreHistory restores history from disk.
 func (job Job) RestoreHistory(ctx context.Context) (output []cron.JobInvocation, err error) {
-	historyPath := filepath.Join(job.Config.HistoryPathOrDefault(), stringutil.Slugify(job.Name())+".json")
-	if _, statErr := os.Stat(historyPath); statErr != nil {
+	if job.History != nil {
+		output, err = job.History.RestoreHistory(ctx)
 		return
 	}
-	var f *os.File
-	f, err = os.Open(historyPath)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-	err = json.NewDecoder(f).Decode(&output)
 	return
 }
 

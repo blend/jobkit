@@ -18,16 +18,15 @@ type Parameter struct {
 }
 
 // RenderLabel returns the html string for the input label.
-func (p Parameter) RenderLabel() template.HTML {
+func (p Parameter) RenderLabel(attributes ...string) template.HTML {
 	if p.Label != "" {
-		return template.HTML(fmt.Sprintf("<label>%s</label>", p.Label))
+		return template.HTML(fmt.Sprintf("<label %s>%s</label>", strings.Join(attributes, " "), p.Label))
 	}
 	return ""
 }
 
 // RenderInput returns the html string for the input.
-func (p Parameter) RenderInput() template.HTML {
-	var attributes []string
+func (p Parameter) RenderInput(attributes ...string) template.HTML {
 	if p.Name != "" {
 		attributes = append(attributes, htmlAttr("name", p.Name))
 	}
@@ -51,6 +50,9 @@ func (p Parameter) RenderInput() template.HTML {
 	}
 
 	attributes = append(attributes, htmlAttr("type", "text"))
+	if p.Value != "" {
+		attributes = append(attributes, htmlAttr("value", p.Value))
+	}
 	if p.Placeholder != "" {
 		attributes = append(attributes, htmlAttr("placeholder", p.Placeholder))
 	}

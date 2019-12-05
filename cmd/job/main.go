@@ -26,23 +26,23 @@ import (
 )
 
 var (
-	flagTitle                                *string
-	flagBind                                 *string
-	flagConfigPath                           *string
-	flagDisableServer                        *bool
-	flagUseViewFiles                         *bool
-	flagDefaultJobName                       *string
-	flagDefaultJobExec                       *string
-	flagDefaultJobSchedule                   *string
-	flagDefaultJobHistoryDisabled            *bool
-	flagDefaultJobHistoryPersistenceDisabled *bool
-	flagDefaultJobHistoryPath                *string
-	flagDefaultJobHistoryMaxCount            *int
-	flagDefaultJobHistoryMaxAge              *time.Duration
-	flagDefaultJobTimeout                    *time.Duration
-	flagDefaultJobShutdownGracePeriod        *time.Duration
-	flagDefaultJobLabels                     *[]string
-	flagDefaultJobDiscardOutput              *bool
+	flagTitle                               *string
+	flagBind                                *string
+	flagConfigPath                          *string
+	flagDisableServer                       *bool
+	flagUseViewFiles                        *bool
+	flagDefaultJobName                      *string
+	flagDefaultJobExec                      *string
+	flagDefaultJobSchedule                  *string
+	flagDefaultJobHistoryDisabled           *bool
+	flagDefaultJobHistoryPersistenceEnabled *bool
+	flagDefaultJobHistoryPath               *string
+	flagDefaultJobHistoryMaxCount           *int
+	flagDefaultJobHistoryMaxAge             *time.Duration
+	flagDefaultJobTimeout                   *time.Duration
+	flagDefaultJobShutdownGracePeriod       *time.Duration
+	flagDefaultJobLabels                    *[]string
+	flagDefaultJobDiscardOutput             *bool
 )
 
 func initFlags(cmd *cobra.Command) {
@@ -55,7 +55,7 @@ func initFlags(cmd *cobra.Command) {
 	flagDefaultJobName = cmd.Flags().StringP("name", "n", "", "The job name (will default to a random string of 8 letters).")
 	flagDefaultJobSchedule = cmd.Flags().StringP("schedule", "s", "", "The job schedule in cron format (ex: '*/5 * * * *')")
 	flagDefaultJobHistoryPath = cmd.Flags().String("history-path", "", "The job history path.")
-	flagDefaultJobHistoryPersistenceDisabled = cmd.Flags().Bool("history-persistence-disabled", true, "If job history should not be saved to disk.")
+	flagDefaultJobHistoryPersistenceEnabled = cmd.Flags().Bool("history-persistence-enabled", false, "If job history should be saved to disk.")
 	flagDefaultJobHistoryDisabled = cmd.Flags().Bool("history-disabled", false, "If job history should be tracked in memory.")
 	flagDefaultJobHistoryMaxCount = cmd.Flags().Int("history-max-count", 0, "Maximum number of history items to maintain (defaults unbounded).")
 	flagDefaultJobHistoryMaxAge = cmd.Flags().Duration("history-max-age", 0, "Maximum age of history items to maintain (defaults unbounded).")
@@ -124,7 +124,7 @@ func (djc *defaultJobConfig) Resolve() error {
 		configutil.SetBool(&djc.DiscardOutput, configutil.Bool(flagDefaultJobDiscardOutput), configutil.Bool(djc.DiscardOutput), configutil.Bool(ref.Bool(false))),
 		configutil.SetString(&djc.Schedule, configutil.String(*flagDefaultJobSchedule), configutil.String(djc.Schedule)),
 		configutil.SetBool(&djc.HistoryDisabled, configutil.Bool(flagDefaultJobHistoryDisabled), configutil.Bool(djc.HistoryDisabled), configutil.Bool(ref.Bool(false))),
-		configutil.SetBool(&djc.HistoryPersistenceDisabled, configutil.Bool(flagDefaultJobHistoryPersistenceDisabled), configutil.Bool(djc.HistoryPersistenceDisabled), configutil.Bool(ref.Bool(true))),
+		configutil.SetBool(&djc.HistoryPersistenceEnabled, configutil.Bool(flagDefaultJobHistoryPersistenceEnabled), configutil.Bool(djc.HistoryPersistenceEnabled), configutil.Bool(ref.Bool(false))),
 		configutil.SetString(&djc.HistoryPath, configutil.String(*flagDefaultJobHistoryPath), configutil.String(djc.HistoryPath)),
 		configutil.SetInt(&djc.HistoryMaxCount, configutil.Int(*flagDefaultJobHistoryMaxCount), configutil.Int(djc.HistoryMaxCount)),
 		configutil.SetDuration(&djc.HistoryMaxAge, configutil.Duration(*flagDefaultJobHistoryMaxAge), configutil.Duration(djc.HistoryMaxAge)),
@@ -271,7 +271,7 @@ func run(cmd *cobra.Command, args []string) error {
 		disabled := ansi.ColorRed.Apply("disabled")
 		log.Infof("loading job `%s` with exec: %s", jobCfg.Name, ansi.ColorLightWhite.Apply(strings.Join(jobCfg.Exec, " ")))
 		log.Infof("loading job `%s` with schedule: %s", jobCfg.Name, ansi.ColorLightWhite.Apply(jobCfg.ScheduleOrDefault()))
-		if !jobCfg.HistoryDisabledOrDefault() && !jobCfg.HistoryPersistenceDisabledOrDefault() {
+		if !jobCfg.HistoryDisabledOrDefault() && jobCfg.HistoryPersistenceEnabledOrDefault() {
 			log.Infof("loading job `%s` with history: %v and persistence: %v to output path: %s", jobCfg.Name, enabled, enabled, ansi.ColorLightWhite.Apply(jobCfg.HistoryPathOrDefault()))
 		} else if !jobCfg.HistoryDisabledOrDefault() {
 			log.Infof("loading job `%s` with history: %v and persistence: %v", jobCfg.Name, enabled, disabled)
@@ -327,7 +327,10 @@ func createJobFromConfig(base config, cfg jobConfig) (*jobkit.Job, error) {
 	if len(cfg.Exec) == 0 {
 		return nil, ex.New("job exec and command unset", ex.OptMessagef("job: %s", cfg.Name))
 	}
-	action := jobkit.ShellAction(cfg.Exec, jobkit.OptShellActionDiscardOutput(cfg.DiscardOutputOrDefault()))
+	action := jobkit.ShellAction(cfg.Exec,
+		jobkit.OptShellActionDiscardOutput(cfg.DiscardOutputOrDefault()),
+		jobkit.OptShellActionSkipExpandEnv(false), // expand environment
+	)
 	job, err := jobkit.NewJob(cfg.JobConfig, action)
 	if err != nil {
 		return nil, err

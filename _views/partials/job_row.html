@@ -112,7 +112,7 @@
 	{{ if .ViewModel.Current }}
 		<a class="uk-button uk-button-danger" href="/job.cancel/{{ .ViewModel.Name | urlencode }}" uk-icon="close" uk-tooltip="Cancel the running job"></a>
 	{{ else }}
-		<a class="uk-button uk-button-primary" href="/job.run/{{ .ViewModel.Name | urlencode }}" uk-icon="play" uk-tooltip="Force the job to run"></a>
+		<a class="uk-button uk-button-primary" href="/job.parameters/{{ .ViewModel.Name | urlencode }}" uk-icon="play" uk-tooltip="Force the job to run"></a>
 	{{ end }}
 	</td>
 </tr>

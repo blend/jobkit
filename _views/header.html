@@ -22,7 +22,7 @@
 	.uk-navbar-toggle {
 		min-height: 52px;
 		padding: 0 8px;
-		font-size: 0.85rem;
+		font-size: 0.66rem;
 	}
 	#content {
 		margin-top: 52px;
@@ -35,7 +35,7 @@
 		display:inline-block;
 	}
 	.uk-logo {
-		font-size: 24px;
+		font-size: 20px;
 		color: #fff;
 	}
 	.uk-label a {
@@ -49,25 +49,29 @@
 	.uk-container h1, .uk-container h2, .uk-container h3, .uk-container h4, .uk-container h5, .uk-container h6 {
 		margin-top: 20px;
 	}
+
+	.uk-breadcrumb > li > a {
+		text-decoration: underline;
+	}
 	</style>
 </head>
 <body>
 <header id="top-head" class="uk-position-fixed">
-	<div class="uk-container uk-container-expand uk-background-primary">
-		<nav class="uk-navbar uk-light" data-uk-navbar="mode:click; duration: 250" uk-navbar>
+	<div class="uk-container uk-container-expand">
+		<nav class="uk-navbar" data-uk-navbar="mode:click; duration: 250" uk-navbar>
 			<div class="uk-navbar-left">
-				<span class="uk-icon" uk-icon="icon: home; ratio: 1.5"></span>
+				<span class="uk-icon" uk-icon="icon: home; ratio: 1.4"></span>
 				<a href="/" class="uk-navbar-item uk-logo">{{ (.Ctx.State.Get "Config").TitleOrDefault }}</a>
 			</div>
 			<div class="uk-navbar-center">
-				<div class="uk-navbar-item uk-visible@s">
-					<form action="/search" class="uk-search uk-search-navbar">
-						<span uk-search-icon></span>
-						<input name="selector" class="uk-search-input search-field" type="search" placeholder="Search" value="{{ .Ctx.State.Get "selector" }}">
-					</form>
-				</div>
+
 			</div>
 			<div class="uk-navbar-right">
+				<div class="uk-navbar-item uk-visible@s">
+					<form action="/search">
+						<input name="selector" class="uk-input" type="search" placeholder="Search" value="{{ .Ctx.State.Get "selector" }}">
+					</form>
+				</div>
 			</div>
 		</nav>
 	</div>

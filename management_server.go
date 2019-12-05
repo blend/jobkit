@@ -64,6 +64,12 @@ func (ms ManagementServer) Register(app *web.App) {
 	app.PanicAction = func(r *web.Ctx, err interface{}) web.Result {
 		return r.Views.InternalError(ex.New(err))
 	}
+	app.Views.FuncMap["format_environ"] = func(params cron.JobParameters) string {
+		if len(params) == 0 {
+			return "-"
+		}
+		return strings.Join(ParameterValuesAsEnviron(params), ",")
+	}
 
 	// web specific routes
 	app.GET("/status.json", ms.getStatus)
@@ -123,6 +129,10 @@ func (ms ManagementServer) getStatus(r *web.Ctx) web.Result {
 
 // getStatic is mapped to GET /static/*filepath
 func (ms ManagementServer) getStatic(r *web.Ctx) web.Result {
+	if ms.Config.UseViewFilesOrDefault() {
+		return web.Static(filepath.Join("_static", web.StringValue(r.RouteParam("filepath"))))
+	}
+
 	path, err := r.RouteParam("filepath")
 	if err != nil {
 		web.Text.NotFound()
@@ -201,7 +211,15 @@ func (ms ManagementServer) getJobParameters(r *web.Ctx) web.Result {
 	if result != nil {
 		return result
 	}
-	return r.Views.View("parameters", jobScheduler.Job.(*Job).Config.Parameters)
+	job, ok := jobScheduler.Job.(*Job)
+	if !ok {
+		return r.Views.InternalError(ex.New("job is not a jobkit job; cannot fetch parameters"))
+	}
+	parameters := job.Config.Parameters
+	if len(parameters) == 0 {
+		return web.Redirect("/job.run/" + jobScheduler.Name())
+	}
+	return r.Views.View("parameters", job)
 }
 
 // getJobRun is mapped to GET /job.run/:jobName
@@ -210,12 +228,12 @@ func (ms ManagementServer) getJobRun(r *web.Ctx) web.Result {
 	if result != nil {
 		return result
 	}
-
 	if err := r.Request.ParseForm(); err != nil {
 		return r.Views.BadRequest(err)
 	}
+	parameters := ParameterValuesFromForm(r.Request.Form)
 
-	ji, err := ms.Cron.RunJobContext(WithParameterValues(context.Background(), ParameterValuesFromForm(r.Request.Form)), job.Name())
+	ji, err := job.RunAsyncContext(cron.WithJobParameters(context.Background(), parameters))
 	if err != nil {
 		return r.Views.BadRequest(err)
 	}
@@ -325,7 +343,7 @@ func (ms ManagementServer) postAPIJobRun(r *web.Ctx) web.Result {
 		return web.JSON.BadRequest(err)
 	}
 
-	var params ParameterValues
+	var params cron.JobParameters
 	if len(body) > 0 {
 		params, err = ParameterValuesFromJSON(body)
 		if err != nil {
@@ -333,7 +351,7 @@ func (ms ManagementServer) postAPIJobRun(r *web.Ctx) web.Result {
 		}
 	}
 
-	ji, err := ms.Cron.RunJobContext(WithParameterValues(context.Background(), params), job.Name())
+	ji, err := ms.Cron.RunJobContext(cron.WithJobParameters(context.Background(), params), job.Name())
 	if err != nil {
 		return web.JSON.BadRequest(err)
 	}
