@@ -19,6 +19,15 @@ jobs:
         placeholder: "put a message here"
         value: "THIS IS A TEST"
         required: true
+      - name: "ENVIRONMENT"
+        label: "Environment"
+        value: "sandbox"
+        options:
+          - value: "sandbox"
+            text: "Sandbox"
+          - value: "production"
+            text: "Production"
     exec:
       - "echo"
-      - "${MESSAGE}!"
+      - "${MESSAGE}"
+      - "${ENVIRONMENT}"

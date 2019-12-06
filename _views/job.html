@@ -53,30 +53,30 @@
 		</div>
 	</div>
     <div class="uk-grid uk-grid-divider uk-grid-small uk-child-width-1-5 uk-text-center">
-		<div class="uk-first-column">
-            <span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="history"></span>History</span>
+		<div class="uk-first-column uk-margin uk-margin-top">
+            <span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="history"></span>Detailed Job History</span>
             {{ if .ViewModel.Status.HistoryDisabled }}
-            <h3 class="uk-text-danger">Disabled</h3>
+            <h1 class="uk-text-danger">Disabled</h1>
             {{ else }}
-            <h3 class="uk-text-primary">Enabled</h3>
+            <h1 class="uk-text-primary">Enabled</h1>
             {{ end }}
         </div>
-		<div>
+		<div class="uk-margin">
             <span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="history"></span>History Persistence</span>
             {{ if .ViewModel.Status.HistoryPersistenceEnabled }}
-            <h3 class="uk-text-primary">Enabled</h3>
+            <h1 class="uk-text-primary">Enabled</h1>
             {{ else }}
-            <h3 class="uk-text-danger">Disabled</h3>
+            <h1 class="uk-text-danger">Disabled</h1>
             {{ end }}
         </div>
-		<div>
-            <span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="history"></span>Retention</span>
+		<div class="uk-margin">
+            <span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="history"></span>History Retention</span>
             {{ if .ViewModel.Status.HistoryMaxCount }}
-            <h3 class="uk-text-primary">{{ .ViewModel.Status.HistoryMaxCount }} items</h3>
+            <h1 class="uk-text-primary">{{ .ViewModel.Status.HistoryMaxCount }} items</h1>
             {{ else if .ViewModel.Status.HistoryMaxAge }}
-            <h3 class="uk-text-primary">{{ .ViewModel.Status.HistoryMaxAge | duration_round_millis }} age</h3>
+            <h1 class="uk-text-primary">{{ .ViewModel.Status.HistoryMaxAge | duration_round_millis }} age</h1>
             {{ else }}
-            <h3>-</h3>
+            <h1>Unlimited</h1>
             {{ end }}
         </div>
     </div>

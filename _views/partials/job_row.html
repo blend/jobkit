@@ -1,6 +1,5 @@
 {{ define "partials/job_row" }}
 <tr id="{{ .ViewModel.Name }}">
-
 	<td> <!-- status -->
 
 		{{ if .ViewModel.HistoryDisabled  }}
@@ -53,15 +52,6 @@
 	<td>
 		<a class="uk-button uk-button-link" href="/job/{{ .ViewModel.Name | urlencode }}">{{ .ViewModel.Name }}</a>
 	</td>
-	<td class="uk-width-1-6"> <!-- job labels-->
-	{{ range $key, $value := .ViewModel.Labels}}
-		<div>
-			<span class="uk-label">
-				<a href="/search?selector={{ $key | urlencode }}={{ $value | slugify }}">{{ $key }}={{ $value }}</a>
-			</span>
-		</div>
-	{{ end }}
-	</td>
 	<td> <!-- schedule -->
 	{{ if .ViewModel.Schedule }}
 		{{ .ViewModel.Schedule }}
@@ -113,6 +103,15 @@
 		<a class="uk-button uk-button-danger" href="/job.cancel/{{ .ViewModel.Name | urlencode }}" uk-icon="close" uk-tooltip="Cancel the running job"></a>
 	{{ else }}
 		<a class="uk-button uk-button-primary" href="/job.parameters/{{ .ViewModel.Name | urlencode }}" uk-icon="play" uk-tooltip="Force the job to run"></a>
+	{{ end }}
+	</td>
+</tr>
+<tr class="{{ .ViewModel.Name }}-extra">
+	<td colspan="8"> <!-- job labels-->
+	{{ range $key, $value := .ViewModel.Labels}}
+		<span class="uk-label">
+			<a href="/search?selector={{ $key | urlencode }}={{ $value | slugify }}">{{ $key }}={{ $value }}</a>
+		</span>
 	{{ end }}
 	</td>
 </tr>
