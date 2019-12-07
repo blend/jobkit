@@ -49,13 +49,16 @@ func TestNewJob(t *testing.T) {
 	assert.True(didCallAction)
 }
 
-func TestJobWrap(t *testing.T) {
+func TestWrapJob(t *testing.T) {
 	assert := assert.New(t)
 
-	job := cron.NewJob(cron.OptJobName("test"), cron.OptJobAction(func(_ context.Context) error {
-		return nil
-	}))
-	wrapped := Wrap(job)
+	job := cron.NewJob(
+		cron.OptJobName("test"),
+		cron.OptJobAction(func(_ context.Context) error {
+			return nil
+		}),
+	)
+	wrapped := WrapJob(job)
 	assert.Equal(wrapped.Name(), job.Name())
 	assert.NotNil(job.Action)
 }

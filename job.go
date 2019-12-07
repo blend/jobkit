@@ -49,8 +49,8 @@ func NewJob(cfg JobConfig, action func(context.Context) error, options ...JobOpt
 	return &job, nil
 }
 
-// Wrap wraps a cron job with the jobkit notifications.
-func Wrap(job cron.Job) *Job {
+// WrapJob wraps a cron job with the jobkit notifications.
+func WrapJob(job cron.Job) *Job {
 	j := &Job{
 		Config: JobConfig{
 			JobConfig: cron.JobConfig{
@@ -92,6 +92,9 @@ func Wrap(job cron.Job) *Job {
 	}
 	if typed, ok := job.(cron.ShouldSkipLoggerOutputProvider); ok {
 		j.Config.ShouldSkipLoggerOutput = ref.Bool(typed.ShouldSkipLoggerOutput())
+	}
+	if typed, ok := job.(cron.HistoryProvider); ok {
+		j.History = typed
 	}
 	return j
 }
