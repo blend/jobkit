@@ -21,7 +21,6 @@ import (
 	"github.com/blend/go-sdk/uuid"
 	"github.com/blend/go-sdk/web"
 	"github.com/blend/go-sdk/webutil"
-
 	"github.com/blend/jobkit/static"
 	"github.com/blend/jobkit/views"
 )
@@ -453,7 +452,7 @@ func (ms ManagementServer) getAPIJobInvocationOutputStream(r *web.Ctx) web.Resul
 	if result != nil {
 		return result
 	}
-	es := webutil.EventSource{Output: r.Response}
+	es := webutil.NewEventSource(r.Response)
 	if err := es.StartSession(); err != nil {
 		logger.MaybeError(log, err)
 		return nil

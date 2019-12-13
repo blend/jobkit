@@ -10,12 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/blend/go-sdk/assert"
 	"github.com/blend/go-sdk/bufferutil"
+	"github.com/blend/go-sdk/cron"
 	"github.com/blend/go-sdk/logger"
 	"github.com/blend/go-sdk/r2"
-
-	"github.com/blend/go-sdk/assert"
-	"github.com/blend/go-sdk/cron"
 	"github.com/blend/go-sdk/uuid"
 	"github.com/blend/go-sdk/web"
 )
@@ -142,6 +141,7 @@ func TestManagementServerResume(t *testing.T) {
 	assert := assert.New(t)
 
 	jm, app := createTestManagementServer()
+
 	jm.StartAsync()
 	defer jm.Stop()
 
@@ -633,8 +633,11 @@ func TestManagementServerAPIJobInvocationOutputStream(t *testing.T) {
 		<-finish
 		ji.State = cron.JobInvocationStateComplete
 		ji.Finished = time.Now().UTC()
+
+		job.Lock()
 		job.Last = ji
 		job.Current = nil
+		job.Unlock()
 	}()
 
 	assert.Nil(err)
