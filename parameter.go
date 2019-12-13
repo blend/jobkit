@@ -14,7 +14,7 @@ type Parameter struct {
 	Required    bool              `yaml:"required"`    // indicates the value for this parameter must be set
 	Placeholder string            `yaml:"placeholder"` // placeholder is used to show ghost text in an input.
 	Value       string            `yaml:"value"`       // value is the default value or the provided value.
-	Options     []ParameterOption `yaml:"options"`
+	Options     []ParameterOption `yaml:"options"`     // options are select input options; if they are set the param will be a select
 }
 
 // RenderLabel returns the html string for the input label.
