@@ -27,7 +27,7 @@ workflows:
       - build
       - deploy:
           requires:
-            - unit
+            - build
           filters:
             branches:
               only: master
