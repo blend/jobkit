@@ -19,6 +19,15 @@ jobs:
       - store_artifacts:
           path: coverage.html
           destination: coverage.html
+  deploy:
+    docker:
+      - image: circleci/golang:1.13
+    working_directory: /go/src/github.com/blend/jobkit
+    steps:
+      - checkout
+      - run:
+          name: s3upload
+          command: make upload
 
 workflows:
   version: 2
