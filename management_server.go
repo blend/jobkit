@@ -446,22 +446,20 @@ func (ms ManagementServer) getAPIJobInvocationOutput(r *web.Ctx) web.Result {
 }
 
 func (ms ManagementServer) getAPIJobInvocationOutputStream(r *web.Ctx) web.Result {
-	log := r.App.Log
-
 	invocation, result := ms.getRequestJobInvocation(r, web.JSON)
 	if result != nil {
 		return result
 	}
 	es := webutil.NewEventSource(r.Response)
 	if err := es.StartSession(); err != nil {
-		logger.MaybeError(log, err)
+		logger.MaybeError(r.App.Log, err)
 		return nil
 	}
 
 	if !ms.Cron.IsJobRunning(invocation.JobName) {
-		logger.MaybeDebugf(log, "output stream; job is not running, closing")
+		logger.MaybeDebugf(r.App.Log, "output stream; job is not running, closing")
 		if err := es.EventData("complete", string(invocation.State)); err != nil {
-			logger.MaybeError(log, err)
+			logger.MaybeError(r.App.Log, err)
 		}
 		return nil
 	}
@@ -474,11 +472,11 @@ func (ms ManagementServer) getAPIJobInvocationOutputStream(r *web.Ctx) web.Resul
 			contents, _ := json.Marshal(map[string]interface{}{"data": strings.TrimSuffix(line, "\n")})
 			if strings.HasSuffix(line, "\n") {
 				if err := es.EventData("writeln", string(contents)); err != nil {
-					logger.MaybeError(log, err)
+					logger.MaybeError(r.App.Log, err)
 				}
 			} else {
 				if err := es.EventData("write", string(contents)); err != nil {
-					logger.MaybeError(log, err)
+					logger.MaybeError(r.App.Log, err)
 				}
 			}
 		}
@@ -488,7 +486,7 @@ func (ms ManagementServer) getAPIJobInvocationOutputStream(r *web.Ctx) web.Resul
 	// include catchup chunks
 	if afterNanos, _ := web.Int64Value(r.QueryValue("afterNanos")); afterNanos > 0 {
 		after := time.Unix(0, afterNanos)
-		logger.MaybeDebugf(log, "output stream; sending catchup output stream data from: %v", after)
+		logger.MaybeDebugf(r.App.Log, "output stream; sending catchup output stream data from: %v", after)
 		for _, chunk := range invocation.Output.Chunks {
 			if chunk.Timestamp.After(after) {
 				sendOutputData(chunk)
@@ -496,7 +494,7 @@ func (ms ManagementServer) getAPIJobInvocationOutputStream(r *web.Ctx) web.Resul
 		}
 	}
 
-	logger.MaybeDebugf(log, "output stream; listening for new chunks")
+	logger.MaybeDebugf(r.App.Log, "output stream; listening for new chunks")
 	invocation.OutputHandlers.Add(listenerID, func(chunk bufferutil.BufferChunk) {
 		sendOutputData(chunk)
 	})
@@ -507,18 +505,18 @@ func (ms ManagementServer) getAPIJobInvocationOutputStream(r *web.Ctx) web.Resul
 		select {
 		case <-updateTick:
 			if !ms.Cron.IsJobRunning(invocation.JobName) {
-				logger.MaybeDebugf(log, "output stream; job invocation is complete, closing")
+				logger.MaybeDebugf(r.App.Log, "output stream; job invocation is complete, closing")
 				if err := es.EventData("complete", string(invocation.State)); err != nil {
-					logger.MaybeError(log, err)
+					logger.MaybeError(r.App.Log, err)
 				}
 				return nil
 			}
 			if err := es.Ping(); err != nil {
-				logger.MaybeError(log, err)
+				logger.MaybeError(r.App.Log, err)
 				return nil
 			}
 			if err := es.EventData("elapsed", fmt.Sprintf("%v", time.Now().UTC().Sub(invocation.Started).Round(time.Millisecond))); err != nil {
-				logger.MaybeError(log, err)
+				logger.MaybeError(r.App.Log, err)
 				return nil
 			}
 		}
