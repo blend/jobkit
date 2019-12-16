@@ -1,0 +1,6 @@
+{
+	"go.formatFlags": [
+		"-local=github.com/blend/jobkit"
+	],
+	"go.useLanguageServer": true
+}

@@ -21,6 +21,7 @@ import (
 	"github.com/blend/go-sdk/uuid"
 	"github.com/blend/go-sdk/web"
 	"github.com/blend/go-sdk/webutil"
+
 	"github.com/blend/jobkit/static"
 	"github.com/blend/jobkit/views"
 )
