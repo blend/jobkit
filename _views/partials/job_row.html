@@ -2,7 +2,7 @@
 <tr id="{{ .ViewModel.Name }}">
 	<td> <!-- status -->
 
-		{{ if .ViewModel.HistoryDisabled  }}
+		{{ if .ViewModel.HistoryEnabled | not  }}
 
 		<!-- if history is disabled -->
 		{{ if .ViewModel.Current }}

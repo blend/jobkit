@@ -17,7 +17,7 @@ import (
 var (
 	_ cron.Job                    = (*Job)(nil)
 	_ cron.LabelsProvider         = (*Job)(nil)
-	_ cron.JobConfigProvider      = (*Job)(nil)
+	_ cron.JobConfigProvider      = (*Job)(nil) // handles a bunch of stuff
 	_ cron.ScheduleProvider       = (*Job)(nil)
 	_ cron.OnStartReceiver        = (*Job)(nil)
 	_ cron.OnCompleteReceiver     = (*Job)(nil)
@@ -75,17 +75,17 @@ func WrapJob(job cron.Job) *Job {
 	if typed, ok := job.(cron.ShutdownGracePeriodProvider); ok {
 		j.Config.ShutdownGracePeriod = typed.ShutdownGracePeriod()
 	}
-	if typed, ok := job.(cron.HistoryDisabledProvider); ok {
-		j.Config.HistoryDisabled = ref.Bool(typed.HistoryDisabled())
+	if typed, ok := job.(cron.HistoryEnabledProvider); ok {
+		j.Config.HistoryEnabled = ref.Bool(typed.HistoryEnabled())
 	}
 	if typed, ok := job.(cron.HistoryPersistenceEnabledProvider); ok {
 		j.Config.HistoryPersistenceEnabled = ref.Bool(typed.HistoryPersistenceEnabled())
 	}
 	if typed, ok := job.(cron.HistoryMaxCountProvider); ok {
-		j.Config.HistoryMaxCount = typed.HistoryMaxCount()
+		j.Config.HistoryMaxCount = ref.Int(typed.HistoryMaxCount())
 	}
 	if typed, ok := job.(cron.HistoryMaxAgeProvider); ok {
-		j.Config.HistoryMaxAge = typed.HistoryMaxAge()
+		j.Config.HistoryMaxAge = ref.Duration(typed.HistoryMaxAge())
 	}
 	if typed, ok := job.(cron.ShouldSkipLoggerListenersProvider); ok {
 		j.Config.ShouldSkipLoggerListeners = ref.Bool(typed.ShouldSkipLoggerListeners())
