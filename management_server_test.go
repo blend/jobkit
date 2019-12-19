@@ -167,7 +167,7 @@ func TestManagementServerJob(t *testing.T) {
 
 	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job/%s", jobName)).Bytes()
 	assert.Nil(err)
-	assert.Equal(http.StatusOK, meta.StatusCode)
+	assert.Equal(http.StatusOK, meta.StatusCode, string(contents))
 	assert.Contains(string(contents), jobName)
 	assert.Contains(string(contents), invocationID)
 

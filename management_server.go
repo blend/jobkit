@@ -124,6 +124,9 @@ func (ms ManagementServer) ViewPaths() []string {
 
 // getStatus is mapped to GET /status.json
 func (ms ManagementServer) getStatus(r *web.Ctx) web.Result {
+	if ms.Cron == nil {
+		return web.JSON.InternalError(fmt.Errorf("job manager unset"))
+	}
 	return web.JSON.Result(ms.Cron.Status())
 }
 
