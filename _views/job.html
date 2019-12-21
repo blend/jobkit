@@ -9,6 +9,7 @@
 			</ul>
 		</div>
 	</div>
+	<h3>Details</h3>
 	{{ template "partials/job_table_header" }}
 	{{ template "partials/job_row" .Wrap .ViewModel.Status }}
 	{{ template "partials/job_table_footer" }}
@@ -84,15 +85,13 @@
 	{{ if .ViewModel.Description }}
 	<div class="uk-grid uk-grid-divider uk-grid-medium uk-child-width-1-1">
 		<div>
-			<span class="uk-text-small">Job Body</span>
+			<h3>Exec</h3>
 			<pre>{{ .ViewModel.Description }}</pre>
 		</div>
 	</div>
 	<hr/>
 	{{ end }}
-	<span class="uk-text-small">
-		Previous Invocations
-	</span>
+	<h3>History</h3>
 	<table class="uk-table uk-table-small uk-table-striped">
 		<thead>
 			<tr>
@@ -126,6 +125,10 @@
 				<td class="uk-table-shrink">{{ $ji.Elapsed }}</td>
 				<td class="uk-table-expand uk-text-truncate">{{ if $ji.Err }}{{ $ji.Err }}{{ else }}-{{end}}</td>
 				<td class="uk-table-shrink"><a class="uk-button uk-button-secondary" href="/job.invocation/{{ $ji.JobName | urlencode }}/{{ $ji.ID }}">Output</td>
+			</tr>
+		{{ else }}
+			<tr>
+				<td colspan=7>No History</td>
 			</tr>
 		{{ end }}
 		</tbody>

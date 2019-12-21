@@ -119,6 +119,7 @@ func (ms ManagementServer) ViewPaths() []string {
 		"_views/parameters.html",
 		"_views/partials/job_table.html",
 		"_views/partials/job_row.html",
+		"_views/partials/job_history_chart.html",
 	}
 }
 
