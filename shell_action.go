@@ -14,20 +14,26 @@ import (
 // ShellActionOption mutates a ShellActionOptions object.
 type ShellActionOption func(*ShellActionOptions)
 
+// OptShellActionSkipExpandEnv sets if ShellAction should skip expanding env values.
+func OptShellActionSkipExpandEnv(SkipExpandEnv bool) ShellActionOption {
+	return func(opts *ShellActionOptions) { opts.SkipExpandEnv = SkipExpandEnv }
+}
+
 // OptShellActionDiscardOutput sets the `Discard` field on the options.
 func OptShellActionDiscardOutput(discard bool) ShellActionOption {
 	return func(opts *ShellActionOptions) { opts.DiscardOutput = discard }
 }
 
-// OptShellActionSkipExpandEnv sets if ShellAction should skip expanding env values.
-func OptShellActionSkipExpandEnv(SkipExpandEnv bool) ShellActionOption {
-	return func(opts *ShellActionOptions) { opts.SkipExpandEnv = SkipExpandEnv }
+// OptShellActionHideOutput sets if ShellAction should hide standard out and standard error output.
+func OptShellActionHideOutput(hide bool) ShellActionOption {
+	return func(opts *ShellActionOptions) { opts.HideOutput = hide }
 }
 
 // ShellActionOptions captures options for a shell action.
 type ShellActionOptions struct {
 	SkipExpandEnv bool `yaml:"skipExpandEnv"`
 	DiscardOutput bool `yaml:"discardOutput"`
+	HideOutput    bool `yaml:"hideOutput"`
 }
 
 // ShellAction creates a new shell action.
@@ -61,9 +67,18 @@ func ShellAction(exec []string, opts ...ShellActionOption) func(context.Context)
 		}
 		cmd.Env = append(os.Environ(), ParameterValuesAsEnviron(ji.Parameters)...)
 		if !options.DiscardOutput {
-			cmd.Stdout = io.MultiWriter(ji.Output, os.Stdout)
-			cmd.Stderr = io.MultiWriter(ji.Output, os.Stderr)
+			if !options.HideOutput {
+				cmd.Stdout = io.MultiWriter(ji.Output, os.Stdout)
+				cmd.Stderr = io.MultiWriter(ji.Output, os.Stderr)
+			} else {
+				cmd.Stdout = ji.Output
+				cmd.Stderr = ji.Output
+			}
+		} else if !options.HideOutput {
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
 		}
+
 		return ex.New(cmd.Run())
 	}
 }

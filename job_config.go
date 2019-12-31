@@ -10,16 +10,21 @@ import (
 // You can use this job config by embedding it into your larger job config struct.
 type JobConfig struct {
 	cron.JobConfig `yaml:",inline"`
-
-	// Parameters are optional inputs for jobs.
-	Parameters []Parameter `yaml:"parameters"`
-
-	// Schedule returns the job schedule.
+	// Schedule is the job schedule in cron string form.
 	Schedule string `yaml:"schedule"`
+	// Exec is a job body that shells out for it's action.
+	Exec []string `yaml:"execute"`
+	// SkipExpandEnv skips expanding environment variables in the exec segments.
+	SkipExpandEnv *bool `yaml:"skipExpandEnv"`
+	// DiscardOutput skips setting up output buffers for job invocations.
+	DiscardOutput *bool `yaml:"discardOutput"`
+	// HideOutput skips writing job output to standard output and standard error.
+	HideOutput *bool `yaml:"hideOutput"`
 	// HistoryPath is the base path we should write job history to.
 	// The files for each job will always be $HISTORY_PATH/$NAME.json
 	HistoryPath string `yaml:"historyPath"`
-
+	// Parameters are optional inputs for jobs.
+	Parameters []Parameter `yaml:"parameters"`
 	// EmailDefaults holds the message defaults for email notifications.
 	EmailDefaults email.Message `yaml:"emailDefaults"`
 	// WebhookDefaults set a webhook target for notifications.
@@ -57,6 +62,30 @@ func (jc JobConfig) HistoryPathOrDefault() string {
 		return jc.HistoryPath
 	}
 	return DefaultHistoryPath
+}
+
+// SkipExpandEnvOrDefault returns a value or a default.
+func (jc JobConfig) SkipExpandEnvOrDefault() bool {
+	if jc.SkipExpandEnv != nil {
+		return *jc.SkipExpandEnv
+	}
+	return DefaultSkipExpandEnv
+}
+
+// DiscardOutputOrDefault returns a value or a default.
+func (jc JobConfig) DiscardOutputOrDefault() bool {
+	if jc.DiscardOutput != nil {
+		return *jc.DiscardOutput
+	}
+	return DefaultDiscardOutput
+}
+
+// HideOutputOrDefault returns a value or a default.
+func (jc JobConfig) HideOutputOrDefault() bool {
+	if jc.HideOutput != nil {
+		return *jc.HideOutput
+	}
+	return DefaultHideOutput
 }
 
 // NotifyOnStartOrDefault returns a value or a default.

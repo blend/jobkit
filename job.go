@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/blend/go-sdk/async"
 	"github.com/blend/go-sdk/cron"
 	"github.com/blend/go-sdk/email"
 	"github.com/blend/go-sdk/logger"
-	"github.com/blend/go-sdk/ref"
 	"github.com/blend/go-sdk/sentry"
 	"github.com/blend/go-sdk/slack"
 	"github.com/blend/go-sdk/stats"
@@ -17,7 +17,7 @@ import (
 var (
 	_ cron.Job                    = (*Job)(nil)
 	_ cron.LabelsProvider         = (*Job)(nil)
-	_ cron.JobConfigProvider      = (*Job)(nil) // handles a bunch of stuff
+	_ cron.JobConfigProvider      = (*Job)(nil)
 	_ cron.ScheduleProvider       = (*Job)(nil)
 	_ cron.OnStartReceiver        = (*Job)(nil)
 	_ cron.OnCompleteReceiver     = (*Job)(nil)
@@ -51,52 +51,17 @@ func NewJob(cfg JobConfig, action func(context.Context) error, options ...JobOpt
 
 // WrapJob wraps a cron job with the jobkit notifications.
 func WrapJob(job cron.Job) *Job {
-	j := &Job{
-		Config: JobConfig{
-			JobConfig: cron.JobConfig{
-				Name: job.Name(),
-			},
-		},
-		Action: job.Execute,
-	}
+	var j Job
+	j.Config.Name = job.Name()
+	j.Action = job.Execute
 
+	if typed, ok := job.(cron.JobConfigProvider); ok {
+		j.Config.JobConfig = typed.JobConfig()
+	}
 	if typed, ok := job.(cron.ScheduleProvider); ok {
 		j.CompiledSchedule = typed.Schedule()
 	}
-	if typed, ok := job.(cron.DescriptionProvider); ok {
-		j.Config.Description = typed.Description()
-	}
-	if typed, ok := job.(cron.LabelsProvider); ok {
-		j.Config.Labels = typed.Labels()
-	}
-	if typed, ok := job.(cron.TimeoutProvider); ok {
-		j.Config.Timeout = typed.Timeout()
-	}
-	if typed, ok := job.(cron.ShutdownGracePeriodProvider); ok {
-		j.Config.ShutdownGracePeriod = typed.ShutdownGracePeriod()
-	}
-	if typed, ok := job.(cron.HistoryEnabledProvider); ok {
-		j.Config.HistoryEnabled = ref.Bool(typed.HistoryEnabled())
-	}
-	if typed, ok := job.(cron.HistoryPersistenceEnabledProvider); ok {
-		j.Config.HistoryPersistenceEnabled = ref.Bool(typed.HistoryPersistenceEnabled())
-	}
-	if typed, ok := job.(cron.HistoryMaxCountProvider); ok {
-		j.Config.HistoryMaxCount = ref.Int(typed.HistoryMaxCount())
-	}
-	if typed, ok := job.(cron.HistoryMaxAgeProvider); ok {
-		j.Config.HistoryMaxAge = ref.Duration(typed.HistoryMaxAge())
-	}
-	if typed, ok := job.(cron.ShouldSkipLoggerListenersProvider); ok {
-		j.Config.ShouldSkipLoggerListeners = ref.Bool(typed.ShouldSkipLoggerListeners())
-	}
-	if typed, ok := job.(cron.ShouldSkipLoggerOutputProvider); ok {
-		j.Config.ShouldSkipLoggerOutput = ref.Bool(typed.ShouldSkipLoggerOutput())
-	}
-	if typed, ok := job.(cron.HistoryProvider); ok {
-		j.History = typed
-	}
-	return j
+	return &j
 }
 
 // OptAction sets the job action.
@@ -148,7 +113,8 @@ type Job struct {
 	SentryClient sentry.Sender
 	EmailClient  email.Sender
 
-	History cron.HistoryProvider
+	History             cron.HistoryProvider
+	NotificationsWorker *async.Queue
 }
 
 // Name returns the job name.
@@ -284,7 +250,7 @@ func (job Job) stats(ctx context.Context, flag string) {
 	if job.StatsClient != nil {
 		job.StatsClient.Increment(string(flag), fmt.Sprintf("%s:%s", stats.TagJob, job.Name()))
 		if ji := cron.GetJobInvocation(ctx); ji != nil {
-			job.Debugf(ctx, "notify (email); sending email notification")
+			job.Debugf(ctx, "stats; sending stats to collector")
 			job.Error(ctx, job.StatsClient.TimeInMilliseconds(string(flag), ji.Elapsed, fmt.Sprintf("%s:%s", stats.TagJob, job.Name())))
 		}
 	} else {

@@ -42,7 +42,9 @@ var (
 	flagDefaultJobTimeout                   *time.Duration
 	flagDefaultJobShutdownGracePeriod       *time.Duration
 	flagDefaultJobLabels                    *[]string
+	flagDefaultJobSkipExpandEnv             *bool
 	flagDefaultJobDiscardOutput             *bool
+	flagDefaultJobHideOutput                *bool
 )
 
 func initFlags(cmd *cobra.Command) {
@@ -62,13 +64,15 @@ func initFlags(cmd *cobra.Command) {
 	flagDefaultJobTimeout = cmd.Flags().Duration("timeout", 0, "The job execution timeout as a duration (ex: 5s)")
 	flagDefaultJobShutdownGracePeriod = cmd.Flags().Duration("shutdown-grace-period", 0, "The grace period to wait for the job to complete on stop (ex: 5s)")
 	flagDefaultJobLabels = cmd.Flags().StringSlice("label", nil, "Labels for the job that can be used with filtering or tagging.")
-	flagDefaultJobDiscardOutput = cmd.Flags().Bool("discard-output", false, "If jobs should discard console output from the action.")
+	flagDefaultJobSkipExpandEnv = cmd.Flags().Bool("skip-expand-env", false, "If the job exec should skip expanding environment variables.")
+	flagDefaultJobDiscardOutput = cmd.Flags().Bool("discard-output", false, "If jobs should not save console output from the action in job history.")
+	flagDefaultJobHideOutput = cmd.Flags().Bool("hide-output", false, "If jobs should hide console output from the action.")
 }
 
 type config struct {
 	jobkit.Config `yaml:",inline"`
-	DisableServer *bool       `yaml:"disableServer"`
-	Jobs          []jobConfig `yaml:"jobs"`
+	DisableServer *bool              `yaml:"disableServer"`
+	Jobs          []jobkit.JobConfig `yaml:"jobs"`
 }
 
 func (c *config) Resolve() error {
@@ -83,25 +87,8 @@ func (c *config) Resolve() error {
 	)
 }
 
-type jobConfig struct {
-	// JobConfig is the default jobkit job options.
-	jobkit.JobConfig `yaml:",inline"`
-	// Exec is the command to execute.
-	Exec []string `yaml:"exec"`
-	// DiscardOutput indicates if we should discard output.
-	DiscardOutput *bool `yaml:"discardOutput"`
-}
-
-// DiscardOutputOrDefault returns a value or a default.
-func (jc *jobConfig) DiscardOutputOrDefault() bool {
-	if jc.DiscardOutput != nil {
-		return *jc.DiscardOutput
-	}
-	return false
-}
-
 type defaultJobConfig struct {
-	jobConfig
+	jobkit.JobConfig
 }
 
 func (djc *defaultJobConfig) Resolve() error {
@@ -121,15 +108,17 @@ func (djc *defaultJobConfig) Resolve() error {
 	}
 	return configutil.AnyError(
 		configutil.SetString(&djc.Name, configutil.String(*flagDefaultJobName), configutil.String(env.Env().ServiceName()), configutil.String(djc.Name), configutil.String(stringutil.Letters.Random(8))),
-		configutil.SetBool(&djc.DiscardOutput, configutil.Bool(flagDefaultJobDiscardOutput), configutil.Bool(djc.DiscardOutput), configutil.Bool(ref.Bool(false))),
 		configutil.SetString(&djc.Schedule, configutil.String(*flagDefaultJobSchedule), configutil.String(djc.Schedule)),
-		configutil.SetBool(&djc.HistoryEnabled, configutil.Bool(flagDefaultJobHistoryDisabled), configutil.Bool(djc.HistoryEnabled), configutil.Bool(ref.Bool(true))),
-		configutil.SetBool(&djc.HistoryPersistenceEnabled, configutil.Bool(flagDefaultJobHistoryPersistenceEnabled), configutil.Bool(djc.HistoryPersistenceEnabled), configutil.Bool(ref.Bool(false))),
+		configutil.SetBool(&djc.HistoryEnabled, configutil.Bool(flagDefaultJobHistoryDisabled), configutil.Bool(djc.HistoryEnabled), configutil.Bool(ref.Bool(cron.DefaultHistoryEnabled))),
+		configutil.SetBool(&djc.HistoryPersistenceEnabled, configutil.Bool(flagDefaultJobHistoryPersistenceEnabled), configutil.Bool(djc.HistoryPersistenceEnabled), configutil.Bool(ref.Bool(cron.DefaultHistoryPersistenceEnabled))),
 		configutil.SetString(&djc.HistoryPath, configutil.String(*flagDefaultJobHistoryPath), configutil.String(djc.HistoryPath)),
 		configutil.SetInt(djc.HistoryMaxCount, configutil.Int(*flagDefaultJobHistoryMaxCount), configutil.Int(cron.DefaultHistoryMaxCount)),
 		configutil.SetDuration(djc.HistoryMaxAge, configutil.Duration(*flagDefaultJobHistoryMaxAge), configutil.Duration(cron.DefaultHistoryMaxAge)),
 		configutil.SetDuration(&djc.Timeout, configutil.Duration(*flagDefaultJobTimeout), configutil.Duration(djc.Timeout)),
 		configutil.SetDuration(&djc.ShutdownGracePeriod, configutil.Duration(*flagDefaultJobShutdownGracePeriod), configutil.Duration(djc.ShutdownGracePeriod)),
+		configutil.SetBool(&djc.SkipExpandEnv, configutil.Bool(flagDefaultJobSkipExpandEnv), configutil.Bool(djc.SkipExpandEnv), configutil.Bool(ref.Bool(jobkit.DefaultSkipExpandEnv))),
+		configutil.SetBool(&djc.DiscardOutput, configutil.Bool(flagDefaultJobDiscardOutput), configutil.Bool(djc.DiscardOutput), configutil.Bool(ref.Bool(jobkit.DefaultDiscardOutput))),
+		configutil.SetBool(&djc.HideOutput, configutil.Bool(flagDefaultJobHideOutput), configutil.Bool(djc.HideOutput), configutil.Bool(ref.Bool(jobkit.DefaultHideOutput))),
 	)
 }
 
@@ -208,7 +197,7 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		log.Debugf("using default job: %s", strings.Join(defaultJobCfg.Exec, " "))
-		cfg.Jobs = append(cfg.Jobs, defaultJobCfg.jobConfig)
+		cfg.Jobs = append(cfg.Jobs, defaultJobCfg.JobConfig)
 	}
 
 	if len(cfg.Jobs) == 0 {
@@ -301,11 +290,9 @@ func run(cmd *cobra.Command, args []string) error {
 
 	if !*flagDisableServer {
 		ws := jobkit.NewServer(jobs, cfg.Config)
-
 		if cfg.Config.UseViewFilesOrDefault() {
 			log.Debugf("using view files loaded from disk")
 		}
-
 		ws.Log = log.WithPath("management server")
 		hosted = append(hosted, ws)
 	} else {
@@ -323,20 +310,18 @@ func createDefaultJobConfig(args ...string) (*defaultJobConfig, error) {
 	return cfg, nil
 }
 
-func createJobFromConfig(base config, cfg jobConfig) (*jobkit.Job, error) {
+func createJobFromConfig(base config, cfg jobkit.JobConfig) (*jobkit.Job, error) {
 	if len(cfg.Exec) == 0 {
 		return nil, ex.New("job exec and command unset", ex.OptMessagef("job: %s", cfg.Name))
 	}
 	action := jobkit.ShellAction(cfg.Exec,
+		jobkit.OptShellActionSkipExpandEnv(cfg.SkipExpandEnvOrDefault()),
 		jobkit.OptShellActionDiscardOutput(cfg.DiscardOutputOrDefault()),
-		jobkit.OptShellActionSkipExpandEnv(false), // expand environment
+		jobkit.OptShellActionHideOutput(cfg.HideOutputOrDefault()),
 	)
-	job, err := jobkit.NewJob(cfg.JobConfig, action)
+	job, err := jobkit.NewJob(cfg, action)
 	if err != nil {
 		return nil, err
-	}
-	if job.Config.Description == "" {
-		job.Config.Description = strings.Join(cfg.Exec, " ")
 	}
 	job.EmailDefaults = email.MergeMessages(base.EmailDefaults, cfg.EmailDefaults)
 	job.WebhookDefaults = cfg.WebhookDefaults
