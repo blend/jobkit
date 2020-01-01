@@ -34,7 +34,7 @@ var (
 	flagDefaultJobName                      *string
 	flagDefaultJobExec                      *string
 	flagDefaultJobSchedule                  *string
-	flagDefaultJobHistoryDisabled           *bool
+	flagDefaultJobHistoryEnabled            *bool
 	flagDefaultJobHistoryPersistenceEnabled *bool
 	flagDefaultJobHistoryPath               *string
 	flagDefaultJobHistoryMaxCount           *int
@@ -57,16 +57,16 @@ func initFlags(cmd *cobra.Command) {
 	flagDefaultJobName = cmd.Flags().StringP("name", "n", "", "The job name (will default to a random string of 8 letters).")
 	flagDefaultJobSchedule = cmd.Flags().StringP("schedule", "s", "", "The job schedule in cron format (ex: '*/5 * * * *')")
 	flagDefaultJobHistoryPath = cmd.Flags().String("history-path", "", "The job history path.")
-	flagDefaultJobHistoryPersistenceEnabled = cmd.Flags().Bool("history-persistence-enabled", false, "If job history should be saved to disk.")
-	flagDefaultJobHistoryDisabled = cmd.Flags().Bool("history-disabled", false, "If job history should be tracked in memory.")
+	flagDefaultJobHistoryEnabled = cmd.Flags().Bool("history-enabled", cron.DefaultHistoryEnabled, "If job history should be tracked in memory.")
+	flagDefaultJobHistoryPersistenceEnabled = cmd.Flags().Bool("history-persistence-enabled", cron.DefaultHistoryPersistenceEnabled, "If job history should be saved to disk.")
 	flagDefaultJobHistoryMaxCount = cmd.Flags().Int("history-max-count", 0, "Maximum number of history items to maintain (defaults unbounded).")
 	flagDefaultJobHistoryMaxAge = cmd.Flags().Duration("history-max-age", 0, "Maximum age of history items to maintain (defaults unbounded).")
 	flagDefaultJobTimeout = cmd.Flags().Duration("timeout", 0, "The job execution timeout as a duration (ex: 5s)")
 	flagDefaultJobShutdownGracePeriod = cmd.Flags().Duration("shutdown-grace-period", 0, "The grace period to wait for the job to complete on stop (ex: 5s)")
 	flagDefaultJobLabels = cmd.Flags().StringSlice("label", nil, "Labels for the job that can be used with filtering or tagging.")
-	flagDefaultJobSkipExpandEnv = cmd.Flags().Bool("skip-expand-env", false, "If the job exec should skip expanding environment variables.")
-	flagDefaultJobDiscardOutput = cmd.Flags().Bool("discard-output", false, "If jobs should not save console output from the action in job history.")
-	flagDefaultJobHideOutput = cmd.Flags().Bool("hide-output", false, "If jobs should hide console output from the action.")
+	flagDefaultJobSkipExpandEnv = cmd.Flags().Bool("skip-expand-env", jobkit.DefaultSkipExpandEnv, "If the job exec should skip expanding environment variables.")
+	flagDefaultJobDiscardOutput = cmd.Flags().Bool("discard-output", jobkit.DefaultDiscardOutput, "If jobs should not save console output from the action in job history.")
+	flagDefaultJobHideOutput = cmd.Flags().Bool("hide-output", jobkit.DefaultHideOutput, "If jobs should hide console output from the action.")
 }
 
 type config struct {
@@ -109,7 +109,7 @@ func (djc *defaultJobConfig) Resolve() error {
 	return configutil.AnyError(
 		configutil.SetString(&djc.Name, configutil.String(*flagDefaultJobName), configutil.String(env.Env().ServiceName()), configutil.String(djc.Name), configutil.String(stringutil.Letters.Random(8))),
 		configutil.SetString(&djc.Schedule, configutil.String(*flagDefaultJobSchedule), configutil.String(djc.Schedule)),
-		configutil.SetBool(&djc.HistoryEnabled, configutil.Bool(flagDefaultJobHistoryDisabled), configutil.Bool(djc.HistoryEnabled), configutil.Bool(ref.Bool(cron.DefaultHistoryEnabled))),
+		configutil.SetBool(&djc.HistoryEnabled, configutil.Bool(flagDefaultJobHistoryEnabled), configutil.Bool(djc.HistoryEnabled), configutil.Bool(ref.Bool(cron.DefaultHistoryEnabled))),
 		configutil.SetBool(&djc.HistoryPersistenceEnabled, configutil.Bool(flagDefaultJobHistoryPersistenceEnabled), configutil.Bool(djc.HistoryPersistenceEnabled), configutil.Bool(ref.Bool(cron.DefaultHistoryPersistenceEnabled))),
 		configutil.SetString(&djc.HistoryPath, configutil.String(*flagDefaultJobHistoryPath), configutil.String(djc.HistoryPath)),
 		configutil.SetInt(djc.HistoryMaxCount, configutil.Int(*flagDefaultJobHistoryMaxCount), configutil.Int(cron.DefaultHistoryMaxCount)),

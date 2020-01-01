@@ -46,6 +46,7 @@ func NewJob(cfg JobConfig, action func(context.Context) error, options ...JobOpt
 		}
 	}
 	job.History = HistoryJSON{cfg}
+	job.Notifications = async.NewQueue(job.Notify)
 	return &job, nil
 }
 
@@ -113,8 +114,8 @@ type Job struct {
 	SentryClient sentry.Sender
 	EmailClient  email.Sender
 
-	History             cron.HistoryProvider
-	NotificationsWorker *async.Queue
+	History       cron.HistoryProvider
+	Notifications *async.Queue
 }
 
 // Name returns the job name.
@@ -132,7 +133,7 @@ func (job Job) Schedule() cron.Schedule {
 	return job.CompiledSchedule
 }
 
-// JobConfig returns the underlying job config.
+// JobConfig implements job config provider.
 func (job Job) JobConfig() cron.JobConfig {
 	return job.Config.JobConfig
 }

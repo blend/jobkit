@@ -106,13 +106,4 @@
 	{{ end }}
 	</td>
 </tr>
-<tr class="{{ .ViewModel.Name }}-extra">
-	<td colspan="8"> <!-- job labels-->
-	{{ range $key, $value := .ViewModel.Labels}}
-		<span class="uk-label">
-			<a href="/search?selector={{ $key | urlencode }}={{ $value | slugify }}">{{ $key }}={{ $value }}</a>
-		</span>
-	{{ end }}
-	</td>
-</tr>
 {{ end }}

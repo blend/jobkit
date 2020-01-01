@@ -54,11 +54,11 @@
 	</div>
     <div class="uk-grid uk-grid-divider uk-grid-small uk-child-width-1-5 uk-text-center">
 		<div class="uk-first-column uk-margin uk-margin-top">
-            <span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="history"></span>Detailed Job History</span>
-            {{ if .ViewModel.Status.HistoryDisabled }}
-            <h1 class="uk-text-danger">Disabled</h1>
-            {{ else }}
+            <span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="history"></span>History</span>
+            {{ if .ViewModel.Status.HistoryEnabled }}
             <h1 class="uk-text-primary">Enabled</h1>
+            {{ else }}
+            <h1 class="uk-text-danger">Disabled</h1>
             {{ end }}
         </div>
 		<div class="uk-margin">
@@ -76,16 +76,25 @@
             {{ else if .ViewModel.Status.HistoryMaxAge }}
             <h1 class="uk-text-primary">{{ .ViewModel.Status.HistoryMaxAge | duration_round_millis }} age</h1>
             {{ else }}
-            <h1>Unlimited</h1>
+            <h1>-</h1>
             {{ end }}
         </div>
     </div>
 	<hr/>
+	{{ if (.ViewModel | job).Config.Exec }}
+	<div class="uk-grid uk-grid-divider uk-grid-medium uk-child-width-1-1">
+		<div>
+			<span class="uk-text-small">Exec</span>
+			<pre>{{ (.ViewModel | job).Config.Exec | join " " }}</pre>
+		</div>
+	</div>
+	<hr/>
+	{{ end }}
 	{{ if .ViewModel.Description }}
 	<div class="uk-grid uk-grid-divider uk-grid-medium uk-child-width-1-1">
 		<div>
-			<span class="uk-text-small">Job Body</span>
-			<pre>{{ .ViewModel.Description }}</pre>
+			<span class="uk-text-small">Description</span>
+			<div>{{ .ViewModel.Description }}</div>
 		</div>
 	</div>
 	<hr/>

@@ -13,7 +13,7 @@ type JobConfig struct {
 	// Schedule is the job schedule in cron string form.
 	Schedule string `yaml:"schedule"`
 	// Exec is a job body that shells out for it's action.
-	Exec []string `yaml:"execute"`
+	Exec []string `yaml:"exec"`
 	// SkipExpandEnv skips expanding environment variables in the exec segments.
 	SkipExpandEnv *bool `yaml:"skipExpandEnv"`
 	// DiscardOutput skips setting up output buffers for job invocations.

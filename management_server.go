@@ -70,6 +70,17 @@ func (ms ManagementServer) Register(app *web.App) {
 		}
 		return strings.Join(ParameterValuesAsEnviron(params), ",")
 	}
+	app.Views.FuncMap["job"] = func(viewmodel interface{}) *Job {
+		jobScheduler, ok := viewmodel.(*cron.JobScheduler)
+		if !ok {
+			return nil
+		}
+		job, ok := jobScheduler.Job.(*Job)
+		if !ok {
+			return nil
+		}
+		return job
+	}
 
 	// web specific routes
 	app.GET("/status.json", ms.getStatus)

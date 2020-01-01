@@ -12,7 +12,8 @@ jobs:
       kind: "parameterized"
       team: "bailey"
     schedule: "*/10 * * * *"
-    serial: true
+    historyEnabled: true
+    historyPersistenceEnabled: false
     parameters:
       - name: "MESSAGE"
         label: "Message"
