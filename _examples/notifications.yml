@@ -1,0 +1,26 @@
+title: "Example Job Manager"
+
+web:
+  bindAddr: ":8080"
+
+logger:
+  flags: ["all"]
+
+jobs:
+  - name: "hello world"
+    labels:
+      team: "bailey"
+    schedule: "*/10 * * * *"
+    historyEnabled: true
+    historyPersistenceEnabled: false
+    notifications:
+      retryWait: "5s"
+      maxAttempts: 5
+      onComplete: true
+      onFailure: true
+      webhook:
+        url: "http://localhost:8080/status.json"
+    exec:
+      - "echo"
+      - "hello"
+      - "world"

@@ -323,7 +323,7 @@ func createJobFromConfig(base config, cfg jobkit.JobConfig) (*jobkit.Job, error)
 	if err != nil {
 		return nil, err
 	}
-	job.EmailDefaults = email.MergeMessages(base.EmailDefaults, cfg.EmailDefaults)
-	job.WebhookDefaults = cfg.WebhookDefaults
+	job.EmailDefaults = email.MergeMessages(base.EmailDefaults, cfg.Notifications.Email)
+	job.WebhookDefaults = cfg.Notifications.Webhook
 	return job, nil
 }

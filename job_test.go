@@ -63,7 +63,7 @@ func TestWrapJob(t *testing.T) {
 	assert.NotNil(job.Action)
 }
 
-func TestJobLifecycleHooksNotificationsUnset(t *testing.T) {
+func TestJobLifecycleHooksNotificationsSlack(t *testing.T) {
 	assert := assert.New(t)
 
 	ctx := cron.WithJobInvocation(context.Background(), &cron.JobInvocation{
@@ -78,7 +78,7 @@ func TestJobLifecycleHooksNotificationsUnset(t *testing.T) {
 		SlackClient: slack.MockWebhookSender(slackMessages),
 	}
 
-	job.OnStart(ctx)
+	job.OnBegin(ctx)
 	assert.Empty(slackMessages)
 
 	job.OnComplete(ctx)
@@ -110,16 +110,18 @@ func TestJobLifecycleHooksNotificationsSetDisabled(t *testing.T) {
 	job := &Job{
 		SlackClient: slack.MockWebhookSender(slackMessages),
 		Config: JobConfig{
-			NotifyOnStart:        ref.Bool(false),
-			NotifyOnSuccess:      ref.Bool(false),
-			NotifyOnFailure:      ref.Bool(false),
-			NotifyOnBroken:       ref.Bool(false),
-			NotifyOnFixed:        ref.Bool(false),
-			NotifyOnCancellation: ref.Bool(false),
+			Notifications: JobNotificationsConfig{
+				OnBegin:        ref.Bool(false),
+				OnSuccess:      ref.Bool(false),
+				OnFailure:      ref.Bool(false),
+				OnBroken:       ref.Bool(false),
+				OnFixed:        ref.Bool(false),
+				OnCancellation: ref.Bool(false),
+			},
 		},
 	}
 
-	job.OnStart(ctx)
+	job.OnBegin(ctx)
 	assert.Empty(slackMessages)
 
 	job.OnComplete(ctx)
@@ -152,16 +154,17 @@ func TestJobLifecycleHooksNotificationsSetEnabled(t *testing.T) {
 	job := &Job{
 		SlackClient: slack.MockWebhookSender(slackMessages),
 		Config: JobConfig{
-			NotifyOnStart:        ref.Bool(true),
-			NotifyOnSuccess:      ref.Bool(true),
-			NotifyOnFailure:      ref.Bool(true),
-			NotifyOnBroken:       ref.Bool(true),
-			NotifyOnFixed:        ref.Bool(true),
-			NotifyOnCancellation: ref.Bool(true),
+			Notifications: JobNotificationsConfig{
+				OnBegin:        ref.Bool(true),
+				OnSuccess:      ref.Bool(true),
+				OnFailure:      ref.Bool(true),
+				OnBroken:       ref.Bool(true),
+				OnFixed:        ref.Bool(true),
+				OnCancellation: ref.Bool(true),
+			},
 		},
 	}
-
-	job.OnStart(ctx)
+	job.OnBegin(ctx)
 	job.OnComplete(ctx)
 	job.OnFailure(ctx)
 	job.OnCancellation(ctx)
@@ -203,16 +206,18 @@ func TestJobLifecycleHooksEmailNotifications(t *testing.T) {
 	job := &Job{
 		EmailClient: email.MockSender(emailMessages),
 		Config: JobConfig{
-			NotifyOnStart:        ref.Bool(true),
-			NotifyOnSuccess:      ref.Bool(true),
-			NotifyOnFailure:      ref.Bool(true),
-			NotifyOnBroken:       ref.Bool(true),
-			NotifyOnFixed:        ref.Bool(true),
-			NotifyOnCancellation: ref.Bool(true),
+			Notifications: JobNotificationsConfig{
+				OnBegin:        ref.Bool(true),
+				OnSuccess:      ref.Bool(true),
+				OnFailure:      ref.Bool(true),
+				OnBroken:       ref.Bool(true),
+				OnFixed:        ref.Bool(true),
+				OnCancellation: ref.Bool(true),
+			},
 		},
 	}
 
-	job.OnStart(ctx)
+	job.OnBegin(ctx)
 	job.OnComplete(ctx)
 	job.OnFailure(ctx)
 	job.OnCancellation(ctx)
@@ -261,16 +266,18 @@ func TestJobLifecycleHooksWebhookNotifications(t *testing.T) {
 			URL: hookServer.URL,
 		},
 		Config: JobConfig{
-			NotifyOnStart:        ref.Bool(true),
-			NotifyOnSuccess:      ref.Bool(true),
-			NotifyOnFailure:      ref.Bool(true),
-			NotifyOnBroken:       ref.Bool(true),
-			NotifyOnFixed:        ref.Bool(true),
-			NotifyOnCancellation: ref.Bool(true),
+			Notifications: JobNotificationsConfig{
+				OnBegin:        ref.Bool(true),
+				OnSuccess:      ref.Bool(true),
+				OnFailure:      ref.Bool(true),
+				OnBroken:       ref.Bool(true),
+				OnFixed:        ref.Bool(true),
+				OnCancellation: ref.Bool(true),
+			},
 		},
 	}
 
-	job.OnStart(ctx)
+	job.OnBegin(ctx)
 	job.OnComplete(ctx)
 	job.OnFailure(ctx)
 	job.OnCancellation(ctx)
@@ -294,8 +301,8 @@ func TestJobHistoryProvider(t *testing.T) {
 		HistoryPath: tmpdir,
 	}
 	job := &Job{
-		Config:  cfg,
-		History: HistoryJSON{Config: cfg},
+		Config:          cfg,
+		HistoryProvider: HistoryJSON{Config: cfg},
 	}
 
 	history := []cron.JobInvocation{

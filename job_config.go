@@ -1,6 +1,8 @@
 package jobkit
 
 import (
+	"time"
+
 	"github.com/blend/go-sdk/cron"
 	"github.com/blend/go-sdk/email"
 )
@@ -25,27 +27,8 @@ type JobConfig struct {
 	HistoryPath string `yaml:"historyPath"`
 	// Parameters are optional inputs for jobs.
 	Parameters []Parameter `yaml:"parameters"`
-	// EmailDefaults holds the message defaults for email notifications.
-	EmailDefaults email.Message `yaml:"emailDefaults"`
-	// WebhookDefaults set a webhook target for notifications.
-	WebhookDefaults Webhook `yaml:"webhookDefaults"`
-
-	// NotifyOnStart governs if we should send notifications job start.
-	NotifyOnStart *bool `yaml:"notifyOnStart"`
-	// NotifyOnSuccess governs if we should send notifications on any success.
-	NotifyOnSuccess *bool `yaml:"notifyOnSuccess"`
-	// NotifyOnFailure governs if we should send notifications on any failure.
-	NotifyOnFailure *bool `yaml:"notifyOnFailure"`
-	// NotifyOnCancellation governs if we should send notifications on cancellation.
-	NotifyOnCancellation *bool `yaml:"notifyOnCancellation"`
-	// NotifyOnBroken governs if we should send notifications on a success => failure transition.
-	NotifyOnBroken *bool `yaml:"notifyOnBroken"`
-	// NotifyOnFixed governs if we should send notifications on a failure => success transition.
-	NotifyOnFixed *bool `yaml:"notifyOnFixed"`
-	// NotifyOnEnabled governs if we should send notifications when a job is enabled.
-	NotifyOnEnabled *bool `yaml:"notifyOnEnabled"`
-	// NotifyOnDisabled governs if we should send notifications when a job is disabled.
-	NotifyOnDisabled *bool `yaml:"notifyOnDisabled"`
+	// Notifications hold options for notifications.
+	Notifications JobNotificationsConfig `yaml:"notifications"`
 }
 
 // ScheduleOrDefault returns the schedule or a default (every 5 minutes).
@@ -88,66 +71,96 @@ func (jc JobConfig) HideOutputOrDefault() bool {
 	return DefaultHideOutput
 }
 
-// NotifyOnStartOrDefault returns a value or a default.
-func (jc JobConfig) NotifyOnStartOrDefault() bool {
-	if jc.NotifyOnStart != nil {
-		return *jc.NotifyOnStart
+// JobNotificationsConfig are the notification options for a job.
+type JobNotificationsConfig struct {
+	// Email holds the message defaults for email notifications.
+	Email email.Message `yaml:"email"`
+	// Webhook set a webhook target for notifications.
+	Webhook Webhook `yaml:"webhook"`
+
+	// MaxRetries is the maximum number of retries before we give up on a notification.
+	MaxRetries int `yaml:"maxRetries"`
+	// RetryWait is the time between attempts.
+	RetryWait time.Duration `yaml:"retryWait"`
+
+	// OnBegin governs if we should send notifications job start.
+	OnBegin *bool `yaml:"onBegin"`
+	// NotifyOnSuccess governs if we should send notifications on any success.
+	OnSuccess *bool `yaml:"onSuccess"`
+	// NotifyOnFailure governs if we should send notifications on any failure.
+	OnFailure *bool `yaml:"onFailure"`
+	// NotifyOnCancellation governs if we should send notifications on cancellation.
+	OnCancellation *bool `yaml:"onCancellation"`
+	// NotifyOnBroken governs if we should send notifications on a success => failure transition.
+	OnBroken *bool `yaml:"onBroken"`
+	// NotifyOnFixed governs if we should send notifications on a failure => success transition.
+	OnFixed *bool `yaml:"onFixed"`
+	// NotifyOnEnabled governs if we should send notifications when a job is enabled.
+	OnEnabled *bool `yaml:"onEnabled"`
+	// NotifyOnDisabled governs if we should send notifications when a job is disabled.
+	OnDisabled *bool `yaml:"onDisabled"`
+}
+
+// OnBeginOrDefault returns a value or a default.
+func (jnc JobNotificationsConfig) OnBeginOrDefault() bool {
+	if jnc.OnBegin != nil {
+		return *jnc.OnBegin
 	}
 	return false
 }
 
-// NotifyOnSuccessOrDefault returns a value or a default.
-func (jc JobConfig) NotifyOnSuccessOrDefault() bool {
-	if jc.NotifyOnSuccess != nil {
-		return *jc.NotifyOnSuccess
+// OnSuccessOrDefault returns a value or a default.
+func (jnc JobNotificationsConfig) OnSuccessOrDefault() bool {
+	if jnc.OnSuccess != nil {
+		return *jnc.OnSuccess
 	}
 	return false
 }
 
-// NotifyOnFailureOrDefault returns a value or a default.
-func (jc JobConfig) NotifyOnFailureOrDefault() bool {
-	if jc.NotifyOnFailure != nil {
-		return *jc.NotifyOnFailure
+// OnFailureOrDefault returns a value or a default.
+func (jnc JobNotificationsConfig) OnFailureOrDefault() bool {
+	if jnc.OnFailure != nil {
+		return *jnc.OnFailure
 	}
 	return true
 }
 
-// NotifyOnCancellationOrDefault returns a value or a default.
-func (jc JobConfig) NotifyOnCancellationOrDefault() bool {
-	if jc.NotifyOnCancellation != nil {
-		return *jc.NotifyOnCancellation
+// OnCancellationOrDefault returns a value or a default.
+func (jnc JobNotificationsConfig) OnCancellationOrDefault() bool {
+	if jnc.OnCancellation != nil {
+		return *jnc.OnCancellation
 	}
 	return true
 }
 
-// NotifyOnBrokenOrDefault returns a value or a default.
-func (jc JobConfig) NotifyOnBrokenOrDefault() bool {
-	if jc.NotifyOnBroken != nil {
-		return *jc.NotifyOnBroken
+// OnBrokenOrDefault returns a value or a default.
+func (jnc JobNotificationsConfig) OnBrokenOrDefault() bool {
+	if jnc.OnBroken != nil {
+		return *jnc.OnBroken
 	}
 	return true
 }
 
-// NotifyOnFixedOrDefault returns a value or a default.
-func (jc JobConfig) NotifyOnFixedOrDefault() bool {
-	if jc.NotifyOnFixed != nil {
-		return *jc.NotifyOnFixed
+// OnFixedOrDefault returns a value or a default.
+func (jnc JobNotificationsConfig) OnFixedOrDefault() bool {
+	if jnc.OnFixed != nil {
+		return *jnc.OnFixed
 	}
 	return true
 }
 
-// NotifyOnEnabledOrDefault returns a value or a default.
-func (jc JobConfig) NotifyOnEnabledOrDefault() bool {
-	if jc.NotifyOnEnabled != nil {
-		return *jc.NotifyOnEnabled
+// OnEnabledOrDefault returns a value or a default.
+func (jnc JobNotificationsConfig) OnEnabledOrDefault() bool {
+	if jnc.OnEnabled != nil {
+		return *jnc.OnEnabled
 	}
 	return false
 }
 
-// NotifyOnDisabledOrDefault returns a value or a default.
-func (jc JobConfig) NotifyOnDisabledOrDefault() bool {
-	if jc.NotifyOnDisabled != nil {
-		return *jc.NotifyOnDisabled
+// OnDisabledOrDefault returns a value or a default.
+func (jnc JobNotificationsConfig) OnDisabledOrDefault() bool {
+	if jnc.OnDisabled != nil {
+		return *jnc.OnDisabled
 	}
 	return false
 }
