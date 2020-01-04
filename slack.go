@@ -8,8 +8,8 @@ import (
 )
 
 // NewSlackMessage returns a new job started message.
-func NewSlackMessage(flag string, ji *cron.JobInvocation, options ...slack.MessageOption) slack.Message {
-	message := slack.Message{}
+func NewSlackMessage(flag string, defaults slack.Message, ji *cron.JobInvocation, options ...slack.MessageOption) slack.Message {
+	message := defaults
 	if ji.Err != nil {
 		message.Attachments = append(message.Attachments,
 			slack.MessageAttachment{

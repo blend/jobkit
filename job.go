@@ -9,6 +9,7 @@ import (
 	"github.com/blend/go-sdk/email"
 	"github.com/blend/go-sdk/ex"
 	"github.com/blend/go-sdk/logger"
+	"github.com/blend/go-sdk/r2"
 	"github.com/blend/go-sdk/sentry"
 	"github.com/blend/go-sdk/slack"
 	"github.com/blend/go-sdk/stats"
@@ -37,12 +38,13 @@ var (
 // NewJob returns a new job.
 func NewJob(cfg JobConfig, action func(context.Context) error, options ...JobOption) (*Job, error) {
 	retryQueueOptions := []RetryQueueOption{
-		OptRetryQueueMaxAttempts(128),
-		OptRetryQueueRetryWait(5 * time.Second),
+		OptRetryQueueMaxAttempts(5),
+		OptRetryQueueRetryWaitBackoff(5 * time.Second),
 	}
 
-	var job Job
-	job.HistoryProvider = HistoryJSON{cfg}
+	job := &Job{
+		HistoryProvider: HistoryJSON{cfg},
+	}
 	job.NotificationsEmail = NewRetryQueue(job.notifyEmail, retryQueueOptions...)
 	job.NotificationsSlack = NewRetryQueue(job.notifySlack, retryQueueOptions...)
 	job.NotificationsWebhook = NewRetryQueue(job.notifyWebhook, retryQueueOptions...)
@@ -55,11 +57,11 @@ func NewJob(cfg JobConfig, action func(context.Context) error, options ...JobOpt
 
 	var err error
 	for _, opt := range options {
-		if err = opt(&job); err != nil {
+		if err = opt(job); err != nil {
 			return nil, err
 		}
 	}
-	return &job, nil
+	return job, nil
 }
 
 // WrapJob wraps a cron job with the jobkit notifications.
@@ -70,7 +72,6 @@ func WrapJob(job cron.Job) *Job {
 	j.NotificationsEmail = NewRetryQueue(j.notifyEmail)
 	j.NotificationsSlack = NewRetryQueue(j.notifySlack)
 	j.NotificationsWebhook = NewRetryQueue(j.notifyWebhook)
-
 	if typed, ok := job.(cron.JobConfigProvider); ok {
 		j.Config.JobConfig = typed.JobConfig()
 	}
@@ -92,6 +93,9 @@ func OptAction(action func(context.Context) error) JobOption {
 func OptConfig(cfg JobConfig) JobOption {
 	return func(job *Job) error {
 		job.Config = cfg
+		job.SlackDefaults = cfg.Notifications.Slack
+		job.EmailDefaults = cfg.Notifications.Email
+		job.WebhookDefaults = cfg.Notifications.Webhook
 		return nil
 	}
 }
@@ -122,6 +126,7 @@ type Job struct {
 	Log         logger.Log
 	StatsClient stats.Collector
 
+	SlackDefaults   slack.Message
 	EmailDefaults   email.Message
 	WebhookDefaults Webhook
 
@@ -156,6 +161,7 @@ func (job Job) JobConfig() cron.JobConfig {
 
 // OnLoad implements job on load handler.
 func (job Job) OnLoad() error {
+	logger.MaybeDebugf(job.Log, "starting retry queue workers")
 	job.NotificationsEmail.Log = job.Log
 	go job.NotificationsEmail.Start()
 	<-job.NotificationsEmail.NotifyStarted()
@@ -190,7 +196,7 @@ func (job Job) OnBegin(ctx context.Context) {
 // OnComplete is a lifecycle event handler.
 func (job Job) OnComplete(ctx context.Context) {
 	job.stats(ctx, cron.FlagComplete)
-	if job.Config.Notifications.OnSuccessOrDefault() {
+	if job.Config.Notifications.OnCompleteOrDefault() {
 		job.notify(ctx, cron.FlagComplete)
 	}
 }
@@ -271,14 +277,22 @@ func (job Job) Execute(ctx context.Context) error {
 // Debugf logs a debug message if the logger is set.
 func (job Job) Debugf(ctx context.Context, format string, args ...interface{}) {
 	if job.Log != nil {
-		job.Log.WithPath("cron", job.Name(), cron.GetJobInvocation(ctx).ID).WithContext(ctx).Debugf(format, args...)
+		if ji := cron.GetJobInvocation(ctx); ji != nil {
+			job.Log.WithPath("cron", job.Name(), ji.ID).WithContext(ctx).Debugf(format, args...)
+		} else {
+			job.Log.WithPath("cron", job.Name()).WithContext(ctx).Debugf(format, args...)
+		}
 	}
 }
 
 // Error logs an error if the logger i set.
 func (job Job) Error(ctx context.Context, err error) error {
 	if job.Log != nil && err != nil {
-		job.Log.WithPath("cron", job.Name(), cron.GetJobInvocation(ctx).ID).WithContext(ctx).Error(err)
+		if ji := cron.GetJobInvocation(ctx); ji != nil {
+			job.Log.WithPath("cron", job.Name(), ji.ID).WithContext(ctx).Error(err)
+		} else {
+			job.Log.WithPath("cron", job.Name()).WithContext(ctx).Error(err)
+		}
 	}
 	return err
 
@@ -296,11 +310,11 @@ func (job Job) stats(ctx context.Context, flag string) {
 			job.Error(ctx, job.StatsClient.TimeInMilliseconds(string(flag), ji.Elapsed, fmt.Sprintf("%s:%s", stats.TagJob, job.Name())))
 		}
 	} else {
-		job.Debugf(ctx, "stats client unset, skipping logging stats")
+		job.Debugf(ctx, "stats; client unset, skipping logging stats")
 	}
 }
 
-func (job Job) notifySlack(ctx context.Context, item interface{}) error {
+func (job *Job) notifySlack(ctx context.Context, item interface{}) error {
 	if ji := cron.GetJobInvocation(ctx); ji != nil {
 		job.Debugf(ctx, "notify (slack); sending slack notification")
 		return job.SlackClient.Send(context.Background(), item.(slack.Message))
@@ -308,7 +322,7 @@ func (job Job) notifySlack(ctx context.Context, item interface{}) error {
 	return nil
 }
 
-func (job Job) notifyEmail(ctx context.Context, item interface{}) error {
+func (job *Job) notifyEmail(ctx context.Context, item interface{}) error {
 	if ji := cron.GetJobInvocation(ctx); ji != nil {
 		message, ok := item.(email.Message)
 		if !ok {
@@ -320,21 +334,28 @@ func (job Job) notifyEmail(ctx context.Context, item interface{}) error {
 	return nil
 }
 
-func (job Job) notifyWebhook(ctx context.Context, item interface{}) error {
+func (job *Job) notifyWebhook(ctx context.Context, _ interface{}) error {
 	job.Debugf(ctx, "notify (webhook); sending webhook notification")
-	_, err := job.WebhookDefaults.Request().Discard()
-	return err
+	res, err := job.WebhookDefaults.Request(r2.OptLog(job.Log)).Discard()
+	if err != nil {
+		return err
+	}
+	if res.StatusCode > 299 {
+		return fmt.Errorf("non-200 returned from remote")
+	}
+	return nil
 }
 
-func (job Job) notify(ctx context.Context, flag string) {
+func (job *Job) notify(ctx context.Context, flag string) {
 	if job.SlackClient != nil {
 		if ji := cron.GetJobInvocation(ctx); ji != nil {
-			job.Debugf(ctx, "notify (slack); queueing slack notification")
-			message := NewSlackMessage(flag, ji)
+			message := NewSlackMessage(flag, job.SlackDefaults, ji)
 			if job.NotificationsSlack != nil && job.NotificationsSlack.Latch.IsStarted() {
-				job.NotificationsSlack.Add(context.Background(), message)
+				job.Debugf(ctx, "notify (slack); queueing slack notification")
+				job.NotificationsSlack.Add(ctx, message)
 			} else {
-				job.Error(ctx, job.SlackClient.Send(context.Background(), message))
+				job.Debugf(ctx, "notify (slack); sending slack notification")
+				job.Error(ctx, job.SlackClient.Send(ctx, message))
 			}
 		}
 	} else {
@@ -343,30 +364,31 @@ func (job Job) notify(ctx context.Context, flag string) {
 
 	if job.EmailClient != nil {
 		if ji := cron.GetJobInvocation(ctx); ji != nil {
-			job.Debugf(ctx, "notify (email); queueing email notification")
 			message, err := NewEmailMessage(flag, job.EmailDefaults, ji)
 			if err != nil {
 				job.Error(ctx, err)
 			}
 
 			if job.NotificationsEmail != nil && job.NotificationsEmail.Latch.IsStarted() {
-				job.NotificationsEmail.Add(context.Background(), message)
+				job.Debugf(ctx, "notify (email); queueing email notification")
+				job.NotificationsEmail.Add(ctx, message)
 			} else {
-				job.Error(ctx, job.EmailClient.Send(context.Background(), message))
+				job.Debugf(ctx, "notify (email); sending email notification")
+				job.Error(ctx, job.EmailClient.Send(ctx, message))
 			}
 		}
 	} else {
-		job.Debugf(ctx, "notify (email); email sender unset, skipping sending email notification")
+		job.Debugf(ctx, "notify (email); sender unset, skipping sending email notification")
 	}
 
 	if !job.WebhookDefaults.IsZero() {
-		job.Debugf(ctx, "notify (webhook); queueing webhook notification")
 		if job.NotificationsEmail != nil && job.NotificationsEmail.Latch.IsStarted() {
-			job.NotificationsWebhook.Add(context.Background(), flag)
+			job.Debugf(ctx, "notify (webhook); queueing webhook notification")
+			job.NotificationsWebhook.Add(ctx, flag)
 		} else {
-			job.Error(ctx, job.notifyWebhook(context.Background(), flag))
+			job.Error(ctx, job.notifyWebhook(ctx, flag))
 		}
 	} else {
-		job.Debugf(ctx, "notify (webhook); webhook sender unset, skipping sending webhook notification")
+		job.Debugf(ctx, "notify (webhook); sender unset, skipping sending webhook notification")
 	}
 }

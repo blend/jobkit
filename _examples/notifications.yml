@@ -19,7 +19,7 @@ jobs:
       onComplete: true
       onFailure: true
       webhook:
-        url: "http://localhost:8080/status.json"
+        url: "http://localhost:8080/api/debug/error"
     exec:
       - "echo"
       - "hello"

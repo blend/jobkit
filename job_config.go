@@ -5,6 +5,7 @@ import (
 
 	"github.com/blend/go-sdk/cron"
 	"github.com/blend/go-sdk/email"
+	"github.com/blend/go-sdk/slack"
 )
 
 // JobConfig is something you can use to give your jobs some knobs to turn
@@ -73,6 +74,7 @@ func (jc JobConfig) HideOutputOrDefault() bool {
 
 // JobNotificationsConfig are the notification options for a job.
 type JobNotificationsConfig struct {
+	Slack slack.Message `yaml:"slack"`
 	// Email holds the message defaults for email notifications.
 	Email email.Message `yaml:"email"`
 	// Webhook set a webhook target for notifications.
@@ -85,19 +87,19 @@ type JobNotificationsConfig struct {
 
 	// OnBegin governs if we should send notifications job start.
 	OnBegin *bool `yaml:"onBegin"`
-	// NotifyOnSuccess governs if we should send notifications on any success.
-	OnSuccess *bool `yaml:"onSuccess"`
-	// NotifyOnFailure governs if we should send notifications on any failure.
+	// OnSuccess governs if we should send notifications on any success.
+	OnComplete *bool `yaml:"onComplete"`
+	// OnFailure governs if we should send notifications on any failure.
 	OnFailure *bool `yaml:"onFailure"`
-	// NotifyOnCancellation governs if we should send notifications on cancellation.
+	// OnCancellation governs if we should send notifications on cancellation.
 	OnCancellation *bool `yaml:"onCancellation"`
-	// NotifyOnBroken governs if we should send notifications on a success => failure transition.
+	// OnBroken governs if we should send notifications on a success => failure transition.
 	OnBroken *bool `yaml:"onBroken"`
-	// NotifyOnFixed governs if we should send notifications on a failure => success transition.
+	// OnFixed governs if we should send notifications on a failure => success transition.
 	OnFixed *bool `yaml:"onFixed"`
-	// NotifyOnEnabled governs if we should send notifications when a job is enabled.
+	// OnEnabled governs if we should send notifications when a job is enabled.
 	OnEnabled *bool `yaml:"onEnabled"`
-	// NotifyOnDisabled governs if we should send notifications when a job is disabled.
+	// OnDisabled governs if we should send notifications when a job is disabled.
 	OnDisabled *bool `yaml:"onDisabled"`
 }
 
@@ -109,10 +111,10 @@ func (jnc JobNotificationsConfig) OnBeginOrDefault() bool {
 	return false
 }
 
-// OnSuccessOrDefault returns a value or a default.
-func (jnc JobNotificationsConfig) OnSuccessOrDefault() bool {
-	if jnc.OnSuccess != nil {
-		return *jnc.OnSuccess
+// OnCompleteOrDefault returns a value or a default.
+func (jnc JobNotificationsConfig) OnCompleteOrDefault() bool {
+	if jnc.OnComplete != nil {
+		return *jnc.OnComplete
 	}
 	return false
 }

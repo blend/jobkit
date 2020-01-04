@@ -112,7 +112,7 @@ func TestJobLifecycleHooksNotificationsSetDisabled(t *testing.T) {
 		Config: JobConfig{
 			Notifications: JobNotificationsConfig{
 				OnBegin:        ref.Bool(false),
-				OnSuccess:      ref.Bool(false),
+				OnComplete:     ref.Bool(false),
 				OnFailure:      ref.Bool(false),
 				OnBroken:       ref.Bool(false),
 				OnFixed:        ref.Bool(false),
@@ -156,7 +156,7 @@ func TestJobLifecycleHooksNotificationsSetEnabled(t *testing.T) {
 		Config: JobConfig{
 			Notifications: JobNotificationsConfig{
 				OnBegin:        ref.Bool(true),
-				OnSuccess:      ref.Bool(true),
+				OnComplete:     ref.Bool(true),
 				OnFailure:      ref.Bool(true),
 				OnBroken:       ref.Bool(true),
 				OnFixed:        ref.Bool(true),
@@ -174,7 +174,7 @@ func TestJobLifecycleHooksNotificationsSetEnabled(t *testing.T) {
 	assert.Len(slackMessages, 6)
 
 	msg := <-slackMessages
-	assert.Contains(msg.Attachments[0].Text, "cron.started")
+	assert.Contains(msg.Attachments[0].Text, "cron.begin")
 
 	msg = <-slackMessages
 	assert.Contains(msg.Attachments[0].Text, "cron.complete")
@@ -208,7 +208,7 @@ func TestJobLifecycleHooksEmailNotifications(t *testing.T) {
 		Config: JobConfig{
 			Notifications: JobNotificationsConfig{
 				OnBegin:        ref.Bool(true),
-				OnSuccess:      ref.Bool(true),
+				OnComplete:     ref.Bool(true),
 				OnFailure:      ref.Bool(true),
 				OnBroken:       ref.Bool(true),
 				OnFixed:        ref.Bool(true),
@@ -227,7 +227,7 @@ func TestJobLifecycleHooksEmailNotifications(t *testing.T) {
 	assert.Len(emailMessages, 6)
 
 	msg := <-emailMessages
-	assert.Contains(msg.Subject, "cron.started")
+	assert.Contains(msg.Subject, "cron.begin")
 
 	msg = <-emailMessages
 	assert.Contains(msg.Subject, "cron.complete")
@@ -268,7 +268,7 @@ func TestJobLifecycleHooksWebhookNotifications(t *testing.T) {
 		Config: JobConfig{
 			Notifications: JobNotificationsConfig{
 				OnBegin:        ref.Bool(true),
-				OnSuccess:      ref.Bool(true),
+				OnComplete:     ref.Bool(true),
 				OnFailure:      ref.Bool(true),
 				OnBroken:       ref.Bool(true),
 				OnFixed:        ref.Bool(true),

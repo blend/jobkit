@@ -43,6 +43,23 @@ func OptRetryQueueRetryWait(wait time.Duration) RetryQueueOption {
 	}
 }
 
+// OptRetryQueueRetryWaitProvider sets the retry wait provider.
+func OptRetryQueueRetryWaitProvider(waitProvider func(*RetryQueueWorkItem) time.Duration) RetryQueueOption {
+	return func(rq *RetryQueue) {
+		rq.RetryWaitProvider = waitProvider
+	}
+}
+
+// OptRetryQueueRetryWaitBackoff sets the retry wait to be a backoff based on a base and
+// the number of attempts.
+func OptRetryQueueRetryWaitBackoff(base time.Duration) RetryQueueOption {
+	return func(rq *RetryQueue) {
+		rq.RetryWaitProvider = func(rqwi *RetryQueueWorkItem) time.Duration {
+			return time.Duration(rqwi.Attempts) * base
+		}
+	}
+}
+
 // RetryQueue is a queue that retries on error.
 type RetryQueue struct {
 	Latch             *async.Latch
@@ -121,15 +138,26 @@ func (rq *RetryQueue) NotifyStopped() <-chan struct{} {
 func (rq *RetryQueue) onError(wi *RetryQueueWorkItem, err error) {
 	logger.MaybeError(rq.Log, err)
 
+	// inrecement attempts
 	wi.Attempts = wi.Attempts + 1
+
 	if rq.RetryWaitProvider != nil {
 		if wait := rq.RetryWaitProvider(wi); wait > 0 {
 			logger.MaybeDebugf(rq.Log, "retry queue; work item error; waiting %v", wait)
-			<-time.After(wait)
+			select {
+			case <-time.After(wait):
+				break
+			case <-rq.Latch.NotifyStopping():
+				return
+			}
 		}
 	}
 	if rq.MaxAttempts == 0 || wi.Attempts < rq.MaxAttempts {
-		logger.MaybeDebugf(rq.Log, "retry queue; work item error; requeueing")
+		if rq.MaxAttempts > 0 {
+			logger.MaybeDebugf(rq.Log, "retry queue; work item error; requeueing (%d of %d)", wi.Attempts, rq.MaxAttempts)
+		} else {
+			logger.MaybeDebugf(rq.Log, "retry queue; work item error; requeueing (%d of inf)", wi.Attempts)
+		}
 		rq.Work <- wi
 	}
 }

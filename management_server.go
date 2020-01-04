@@ -117,6 +117,11 @@ func (ms ManagementServer) Register(app *web.App) {
 	app.GET("/api/job.invocation/:jobName/:id", ms.getAPIJobInvocation)
 	app.GET("/api/job.invocation.output/:jobName/:id", ms.getAPIJobInvocationOutput)
 	app.GET("/api/job.invocation.output.stream/:jobName/:id", ms.getAPIJobInvocationOutputStream)
+
+	// debug things
+	app.GET("/api/debug/error", func(r *web.Ctx) web.Result {
+		return web.JSON.InternalError(ex.New("this is only a test"))
+	})
 }
 
 // ViewPaths returns the view paths for the management server.
