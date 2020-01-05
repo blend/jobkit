@@ -3,11 +3,13 @@ package jobkit
 import (
 	"context"
 	"runtime"
+	"sync"
 	"time"
 
 	"github.com/blend/go-sdk/async"
 	"github.com/blend/go-sdk/ex"
 	"github.com/blend/go-sdk/logger"
+	"github.com/blend/go-sdk/uuid"
 )
 
 // NewRetryQueue returns a new retry queue.
@@ -17,6 +19,7 @@ func NewRetryQueue(action async.WorkAction, options ...RetryQueueOption) *RetryQ
 		Parallelism: runtime.NumCPU(),
 		Action:      action,
 		Work:        make(chan *RetryQueueWorkItem, 32),
+		WaitHandles: make(map[string]*async.Latch),
 	}
 	for _, opt := range options {
 		opt(rq)
@@ -69,6 +72,8 @@ type RetryQueue struct {
 	MaxAttempts       int
 	RetryWaitProvider func(*RetryQueueWorkItem) time.Duration
 	Action            async.WorkAction
+	WaitHandles       map[string]*async.Latch
+	WaitHandlesMux    sync.Mutex
 }
 
 // Add adds an item to the queue.
@@ -106,8 +111,12 @@ func (rq *RetryQueue) Start() error {
 			workers[current].Work <- workItem
 			current = (current + 1) % rq.Parallelism
 		case <-rq.Latch.NotifyStopping():
-			for x := 0; x < rq.Parallelism; x++ {
+			for x := 0; x < len(workers); x++ {
 				workers[x].Stop()
+			}
+			for _, waitHandle := range rq.WaitHandles {
+				waitHandle.Stopping()
+				<-waitHandle.NotifyStopped()
 			}
 			rq.Latch.Stopped()
 			return nil
@@ -140,26 +149,48 @@ func (rq *RetryQueue) onError(wi *RetryQueueWorkItem, err error) {
 
 	// inrecement attempts
 	wi.Attempts = wi.Attempts + 1
+	if rq.MaxAttempts == 0 || wi.Attempts > rq.MaxAttempts {
+		return
+	}
 
 	if rq.RetryWaitProvider != nil {
 		if wait := rq.RetryWaitProvider(wi); wait > 0 {
-			logger.MaybeDebugf(rq.Log, "retry queue; work item error; waiting %v", wait)
-			select {
-			case <-time.After(wait):
-				break
-			case <-rq.Latch.NotifyStopping():
-				return
-			}
+			logger.MaybeDebugf(rq.Log, "retry queue; work item error; waiting %v to requeue", wait)
+			rq.wait(wi, wait)
+			return
 		}
 	}
-	if rq.MaxAttempts == 0 || wi.Attempts < rq.MaxAttempts {
-		if rq.MaxAttempts > 0 {
-			logger.MaybeDebugf(rq.Log, "retry queue; work item error; requeueing (%d of %d)", wi.Attempts, rq.MaxAttempts)
-		} else {
-			logger.MaybeDebugf(rq.Log, "retry queue; work item error; requeueing (%d of inf)", wi.Attempts)
-		}
-		rq.Work <- wi
+
+	// requeue immediately
+	if rq.MaxAttempts > 0 {
+		logger.MaybeDebugf(rq.Log, "retry queue; work item error; requeueing (%d of %d)", wi.Attempts, rq.MaxAttempts)
+	} else {
+		logger.MaybeDebugf(rq.Log, "retry queue; work item error; requeueing (%d)", wi.Attempts)
 	}
+	rq.Work <- wi
+}
+
+func (rq *RetryQueue) wait(workItem *RetryQueueWorkItem, wait time.Duration) {
+	rq.WaitHandlesMux.Lock()
+	defer rq.WaitHandlesMux.Unlock()
+	waitHandleID := uuid.V4().String()
+	waitHandle := async.NewLatch()
+	go func() {
+		defer func() {
+			rq.WaitHandlesMux.Lock()
+			defer rq.WaitHandlesMux.Unlock()
+			delete(rq.WaitHandles, waitHandleID)
+		}()
+		select {
+		case <-time.After(wait):
+			rq.Work <- workItem
+			return
+		case <-waitHandle.NotifyStopping():
+			waitHandle.Stopped()
+			return
+		}
+	}()
+	rq.WaitHandles[waitHandleID] = waitHandle
 }
 
 // RetryQueueWorker is a background worker for a retry queue.
