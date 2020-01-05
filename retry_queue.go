@@ -111,12 +111,12 @@ func (rq *RetryQueue) Start() error {
 			workers[current].Work <- workItem
 			current = (current + 1) % rq.Parallelism
 		case <-rq.Latch.NotifyStopping():
-			for x := 0; x < len(workers); x++ {
-				workers[x].Stop()
-			}
 			for _, waitHandle := range rq.WaitHandles {
 				waitHandle.Stopping()
 				<-waitHandle.NotifyStopped()
+			}
+			for x := 0; x < len(workers); x++ {
+				workers[x].Stop()
 			}
 			rq.Latch.Stopped()
 			return nil
@@ -163,9 +163,9 @@ func (rq *RetryQueue) onError(wi *RetryQueueWorkItem, err error) {
 
 	// requeue immediately
 	if rq.MaxAttempts > 0 {
-		logger.MaybeDebugf(rq.Log, "retry queue; work item error; requeueing (%d of %d)", wi.Attempts, rq.MaxAttempts)
+		logger.MaybeDebugf(rq.Log, "retry queue; work item error; immediately requeueing (%d of %d)", wi.Attempts, rq.MaxAttempts)
 	} else {
-		logger.MaybeDebugf(rq.Log, "retry queue; work item error; requeueing (%d)", wi.Attempts)
+		logger.MaybeDebugf(rq.Log, "retry queue; work item error; immediately requeueing (%d)", wi.Attempts)
 	}
 	rq.Work <- wi
 }
@@ -183,6 +183,12 @@ func (rq *RetryQueue) wait(workItem *RetryQueueWorkItem, wait time.Duration) {
 		}()
 		select {
 		case <-time.After(wait):
+			// requeue immediately
+			if rq.MaxAttempts > 0 {
+				logger.MaybeDebugf(rq.Log, "retry queue; work item error; delayed (%v) requeueing (%d of %d)", wait, workItem.Attempts, rq.MaxAttempts)
+			} else {
+				logger.MaybeDebugf(rq.Log, "retry queue; work item error; delayed (%v) requeueing (%d)", wait, workItem.Attempts)
+			}
 			rq.Work <- workItem
 			return
 		case <-waitHandle.NotifyStopping():
