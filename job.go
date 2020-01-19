@@ -17,22 +17,10 @@ import (
 )
 
 var (
-	_ cron.Job                   = (*Job)(nil)
-	_ cron.ScheduleProvider      = (*Job)(nil)
-	_ cron.OnLoadHandler         = (*Job)(nil)
-	_ cron.OnUnloadHandler       = (*Job)(nil)
-	_ cron.LabelsProvider        = (*Job)(nil)
-	_ cron.JobConfigProvider     = (*Job)(nil)
-	_ cron.ScheduleProvider      = (*Job)(nil)
-	_ cron.OnBeginHandler        = (*Job)(nil)
-	_ cron.OnCompleteHandler     = (*Job)(nil)
-	_ cron.OnFailureHandler      = (*Job)(nil)
-	_ cron.OnCancellationHandler = (*Job)(nil)
-	_ cron.OnBrokenHandler       = (*Job)(nil)
-	_ cron.OnFixedHandler        = (*Job)(nil)
-	_ cron.OnDisabledHandler     = (*Job)(nil)
-	_ cron.OnEnabledHandler      = (*Job)(nil)
-	_ cron.HistoryProvider       = (*Job)(nil)
+	_ cron.Job               = (*Job)(nil)
+	_ cron.ScheduleProvider  = (*Job)(nil)
+	_ cron.ConfigProvider    = (*Job)(nil)
+	_ cron.LifecycleProvider = (*Job)(nil)
 )
 
 // NewJob returns a new job.

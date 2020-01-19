@@ -30,7 +30,6 @@ func TestNewJob(t *testing.T) {
 
 	cfg := JobConfig{
 		JobConfig: cron.JobConfig{
-			Name:    "test",
 			Timeout: 2 * time.Second,
 		},
 		Schedule: "@every 1s",

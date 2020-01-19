@@ -1,13 +1,12 @@
 package jobkit
 
 import (
-	"github.com/blend/go-sdk/cron"
 	"github.com/blend/go-sdk/email"
 	"github.com/blend/go-sdk/template"
 )
 
 // NewEmailMessage returns a new email message.
-func NewEmailMessage(flag string, emailDefaults email.Message, ji *cron.JobInvocation, options ...email.MessageOption) (email.Message, error) {
+func NewEmailMessage(flag string, emailDefaults email.Message, ji *JobInvocation, options ...email.MessageOption) (email.Message, error) {
 	message := email.Message{
 		From: emailDefaults.From,
 		To:   emailDefaults.To,
@@ -16,11 +15,11 @@ func NewEmailMessage(flag string, emailDefaults email.Message, ji *cron.JobInvoc
 	vars := map[string]interface{}{
 		"flag":    flag,
 		"jobName": ji.JobName,
-		"state":   ji.State,
+		"status":  ji.Status,
 		"err":     ji.Err,
 	}
-	if ji.Elapsed > 0 {
-		vars["elapsed"] = ji.Elapsed.String()
+	if ji.Elapsed() > 0 {
+		vars["elapsed"] = ji.Elapsed().String()
 	}
 	if ji.Output != nil && len(ji.Output.Chunks) > 0 {
 		vars["output"] = ji.Output.String()
@@ -54,7 +53,7 @@ const (
 	DefaultEmailHTMLBodyTemplate = `
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-<title>{{ .Var "jobName" }} {{ .Var "state" "unknown" }}</title>
+<title>{{ .Var "jobName" }} {{ .Var "status" "unknown" }}</title>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0 " />
@@ -68,7 +67,7 @@ const (
 </style>
 </head>
 <body class="email-body">
-	<h3>{{ .Var "jobName" }} {{ .Var "state" "Unknown" }}</h3>
+	<h3>{{ .Var "jobName" }} {{ .Var "status" "Unknown" }}</h3>
 	{{ if .HasVar "elapsed" }}
 	<div class="email-elapsed"><h4>Elapsed</h4><div>{{ .Var "elapsed" }}</div></div>
 	{{ end }}
@@ -87,7 +86,7 @@ const (
 `
 
 	// DefaultEmailTextBodyTemplate is the default body template.
-	DefaultEmailTextBodyTemplate = `{{ .Var "jobName" }} {{ .Var "state" }}
+	DefaultEmailTextBodyTemplate = `{{ .Var "jobName" }} {{ .Var "status" "unknown" }}
 {{ if .HasVar "elapsed" }}
 Elapsed: {{ .Var "elapsed" }}
 {{ end }}

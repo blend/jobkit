@@ -24,7 +24,11 @@ func (hj HistoryJSON) PersistHistory(ctx context.Context, log []cron.JobInvocati
 			return ex.New(err)
 		}
 	}
-	historyPath := filepath.Join(historyDirectory, stringutil.Slugify(hj.Config.Name)+".json")
+	ji := cron.GetJobInvocation(ctx)
+	if ji == nil {
+		return nil
+	}
+	historyPath := filepath.Join(historyDirectory, stringutil.Slugify(ji.JobName)+".json")
 	f, err := os.Create(historyPath)
 	if err != nil {
 		return err
@@ -35,7 +39,11 @@ func (hj HistoryJSON) PersistHistory(ctx context.Context, log []cron.JobInvocati
 
 // RestoreHistory reads history from disk and returns the log.
 func (hj HistoryJSON) RestoreHistory(ctx context.Context) (output []cron.JobInvocation, err error) {
-	historyPath := filepath.Join(hj.Config.HistoryPathOrDefault(), stringutil.Slugify(hj.Config.Name)+".json")
+	ji := cron.GetJobInvocation(ctx)
+	if ji == nil {
+		return nil, nil
+	}
+	historyPath := filepath.Join(hj.Config.HistoryPathOrDefault(), stringutil.Slugify(ji.JobName)+".json")
 	if _, statErr := os.Stat(historyPath); statErr != nil {
 		return
 	}

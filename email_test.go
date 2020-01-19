@@ -13,10 +13,15 @@ import (
 func TestNewEmailMessage(t *testing.T) {
 	assert := assert.New(t)
 
-	message, err := NewEmailMessage(cron.FlagComplete, email.Message{}, &cron.JobInvocation{
-		JobName: "test",
-		Elapsed: time.Millisecond,
-		State:   cron.JobInvocationStateComplete,
+	ts := time.Now()
+
+	message, err := NewEmailMessage(cron.FlagComplete, email.Message{}, &JobInvocation{
+		JobInvocation: cron.JobInvocation{
+			JobName:  "test",
+			Status:   cron.JobInvocationStatusComplete,
+			Started:  ts,
+			Complete: ts.Add(time.Millisecond),
+		},
 		Output: &bufferutil.Buffer{
 			Chunks: []bufferutil.BufferChunk{
 				{Data: []byte("this is a test")},
