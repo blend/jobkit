@@ -22,10 +22,12 @@ type JobNotificationsConfig struct {
 
 	// OnBegin governs if we should send notifications job start.
 	OnBegin *bool `yaml:"onBegin"`
-	// OnSuccess governs if we should send notifications on any success.
+	// OnComplete governs if we should send notifications on any success.
 	OnComplete *bool `yaml:"onComplete"`
+	// OnSuccess governs if we should send notifications on any success.
+	OnSuccess *bool `yaml:"onSuccess"`
 	// OnFailure governs if we should send notifications on any failure.
-	OnFailure *bool `yaml:"onFailure"`
+	OnError *bool `yaml:"onError"`
 	// OnCancellation governs if we should send notifications on cancellation.
 	OnCancellation *bool `yaml:"onCancellation"`
 	// OnBroken governs if we should send notifications on a success => failure transition.
@@ -54,10 +56,18 @@ func (jnc JobNotificationsConfig) OnCompleteOrDefault() bool {
 	return false
 }
 
-// OnFailureOrDefault returns a value or a default.
-func (jnc JobNotificationsConfig) OnFailureOrDefault() bool {
-	if jnc.OnFailure != nil {
-		return *jnc.OnFailure
+// OnSuccessOrDefault returns a value or a default.
+func (jnc JobNotificationsConfig) OnSuccessOrDefault() bool {
+	if jnc.OnSuccess != nil {
+		return *jnc.OnSuccess
+	}
+	return false
+}
+
+// OnErrorOrDefault returns a value or a default.
+func (jnc JobNotificationsConfig) OnErrorOrDefault() bool {
+	if jnc.OnError != nil {
+		return *jnc.OnError
 	}
 	return true
 }

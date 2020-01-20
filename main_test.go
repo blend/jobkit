@@ -42,14 +42,16 @@ func createTestBufferChunk(index int) bufferutil.BufferChunk {
 	}
 }
 
-func createTestCompleteJobInvocation(jobName string, elapsed time.Duration) cron.JobInvocation {
-	return cron.JobInvocation{
+func createTestCompleteJobInvocation(jobName string, elapsed time.Duration) JobInvocation {
+	ts := time.Now().UTC()
+	return JobInvocation{
+		JobInvocation: cron.JobInvocation{
 		ID:       uuid.V4().String(),
 		JobName:  jobName,
-		Started:  time.Now().UTC(),
-		Finished: time.Now().UTC().Add(elapsed),
+		Started:  ts,
+		Finished: ts.Add(elapsed),
 		State:    cron.JobInvocationStateComplete,
-		Elapsed:  elapsed,
+		},
 		Output: &bufferutil.Buffer{
 			Chunks: []bufferutil.BufferChunk{
 				createTestBufferChunk(0),

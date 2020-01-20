@@ -7,4 +7,7 @@ const (
 	DefaultSkipExpandEnv = false
 	DefaultDiscardOutput = false
 	DefaultHideOutput    = false
+
+	DefaultHistoryMaxCount = 256
+	DefaultHistoryMaxAge   = 0
 )

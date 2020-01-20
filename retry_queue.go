@@ -65,12 +65,12 @@ func OptRetryQueueRetryWaitBackoff(base time.Duration) RetryQueueOption {
 
 // RetryQueue is a queue that retries on error.
 type RetryQueue struct {
-	Latch             *async.Latch
-	Log               logger.Log
-	Work              chan *RetryQueueWorkItem
 	Parallelism       int
 	MaxAttempts       int
 	RetryWaitProvider func(*RetryQueueWorkItem) time.Duration
+	Latch             *async.Latch
+	Log               logger.Log
+	Work              chan *RetryQueueWorkItem
 	Action            async.WorkAction
 	WaitHandles       map[string]*async.Latch
 	WaitHandlesMux    sync.Mutex

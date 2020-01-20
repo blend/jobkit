@@ -18,7 +18,7 @@ func TestNewEmailMessage(t *testing.T) {
 	message, err := NewEmailMessage(cron.FlagComplete, email.Message{}, &JobInvocation{
 		JobInvocation: cron.JobInvocation{
 			JobName:  "test",
-			Status:   cron.JobInvocationStatusComplete,
+			Status:   cron.JobInvocationStatusSuccess,
 			Started:  ts,
 			Complete: ts.Add(time.Millisecond),
 		},

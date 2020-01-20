@@ -10,6 +10,7 @@ import (
 	"github.com/blend/go-sdk/email"
 	"github.com/blend/go-sdk/ex"
 	"github.com/blend/go-sdk/logger"
+	"github.com/blend/go-sdk/mathutil"
 	"github.com/blend/go-sdk/r2"
 	"github.com/blend/go-sdk/sentry"
 	"github.com/blend/go-sdk/slack"
@@ -51,8 +52,8 @@ type JobOption func(*Job) error
 
 // Job is the main job body.
 type Job struct {
-	Job    cron.Job
-	Config JobConfig
+	Job       cron.Job
+	JobConfig JobConfig
 
 	Log         logger.Log
 	StatsClient stats.Collector
@@ -87,7 +88,7 @@ func (job Job) Schedule() cron.Schedule {
 }
 
 // JobConfig implements job config provider.
-func (job Job) JobConfig() cron.JobConfig {
+func (job Job) Config() cron.JobConfig {
 	var cfg cron.JobConfig
 	if typed, ok := job.Job.(cron.ConfigProvider); ok {
 		cfg = typed.Config()
@@ -124,6 +125,62 @@ func (job Job) Lifecycle() (output cron.JobLifecycle) {
 		}
 		return nil
 	}
+
+	output.OnBegin = func(ctx context.Context) {
+		job.OnBegin(ctx)
+		if innerLifecycle.OnBegin != nil {
+			innerLifecycle.OnBegin(ctx)
+		}
+	}
+	output.OnComplete = func(ctx context.Context) {
+		job.OnComplete(ctx)
+		if innerLifecycle.OnComplete != nil {
+			innerLifecycle.OnComplete(ctx)
+		}
+	}
+	output.OnSuccess = func(ctx context.Context) {
+		job.OnSuccess(ctx)
+		if innerLifecycle.OnSuccess != nil {
+			innerLifecycle.OnSuccess(ctx)
+		}
+	}
+	output.OnError = func(ctx context.Context) {
+		job.OnError(ctx)
+		if innerLifecycle.OnError != nil {
+			innerLifecycle.OnError(ctx)
+		}
+	}
+	output.OnCancellation = func(ctx context.Context) {
+		job.OnCancellation(ctx)
+		if innerLifecycle.OnCancellation != nil {
+			innerLifecycle.OnCancellation(ctx)
+		}
+	}
+	output.OnBroken = func(ctx context.Context) {
+		job.OnBroken(ctx)
+		if innerLifecycle.OnBroken != nil {
+			innerLifecycle.OnBroken(ctx)
+		}
+	}
+	output.OnFixed = func(ctx context.Context) {
+		job.OnFixed(ctx)
+		if innerLifecycle.OnFixed != nil {
+			innerLifecycle.OnFixed(ctx)
+		}
+	}
+	output.OnEnabled = func(ctx context.Context) {
+		job.OnEnabled(ctx)
+		if innerLifecycle.OnEnabled != nil {
+			innerLifecycle.OnEnabled(ctx)
+		}
+	}
+	output.OnDisabled = func(ctx context.Context) {
+		job.OnDisabled(ctx)
+		if innerLifecycle.OnDisabled != nil {
+			innerLifecycle.OnDisabled(ctx)
+		}
+	}
+
 	return
 }
 
@@ -155,87 +212,79 @@ func (job Job) OnUnload() error {
 
 // OnBegin is a lifecycle event handler.
 func (job Job) OnBegin(ctx context.Context) {
-	job.stats(ctx, cron.FlagBegin)
-	if job.Config.Notifications.OnBeginOrDefault() {
+	job.sendStats(ctx, cron.FlagBegin)
+	if job.JobConfig.Notifications.OnBeginOrDefault() {
 		job.notify(ctx, cron.FlagBegin)
+	}
+}
+
+// OnSuccess is a lifecycle event handler.
+func (job Job) OnSuccess(ctx context.Context) {
+	job.sendStats(ctx, cron.FlagSuccess)
+	if job.JobConfig.Notifications.OnSuccessOrDefault() {
+		job.notify(ctx, cron.FlagSuccess)
 	}
 }
 
 // OnComplete is a lifecycle event handler.
 func (job Job) OnComplete(ctx context.Context) {
-	job.stats(ctx, cron.FlagComplete)
-	if job.Config.Notifications.OnCompleteOrDefault() {
+	job.sendStats(ctx, cron.FlagComplete)
+	if job.JobConfig.Notifications.OnCompleteOrDefault() {
 		job.notify(ctx, cron.FlagComplete)
 	}
 }
 
 // OnFailure is a lifecycle event handler.
-func (job Job) OnFailure(ctx context.Context) {
-	job.stats(ctx, cron.FlagFailed)
-	if job.Config.Notifications.OnFailureOrDefault() {
-		job.notify(ctx, cron.FlagFailed)
+func (job Job) OnError(ctx context.Context) {
+	job.sendStats(ctx, cron.FlagErrored)
+	if job.JobConfig.Notifications.OnErrorOrDefault() {
+		job.notify(ctx, cron.FlagErrored)
 	}
 }
 
 // OnBroken is a lifecycle event handler.
 func (job Job) OnBroken(ctx context.Context) {
-	job.stats(ctx, cron.FlagBroken)
-	if job.Config.Notifications.OnBrokenOrDefault() {
+	job.sendStats(ctx, cron.FlagBroken)
+	if job.JobConfig.Notifications.OnBrokenOrDefault() {
 		job.notify(ctx, cron.FlagBroken)
 	}
 }
 
 // OnFixed is a lifecycle event handler.
 func (job Job) OnFixed(ctx context.Context) {
-	job.stats(ctx, cron.FlagFixed)
-	if job.Config.Notifications.OnFixedOrDefault() {
+	job.sendStats(ctx, cron.FlagFixed)
+	if job.JobConfig.Notifications.OnFixedOrDefault() {
 		job.notify(ctx, cron.FlagFixed)
 	}
 }
 
 // OnCancellation is a lifecycle event handler.
 func (job Job) OnCancellation(ctx context.Context) {
-	job.stats(ctx, cron.FlagCancelled)
-	if job.Config.Notifications.OnCancellationOrDefault() {
+	job.sendStats(ctx, cron.FlagCancelled)
+	if job.JobConfig.Notifications.OnCancellationOrDefault() {
 		job.notify(ctx, cron.FlagCancelled)
 	}
 }
 
 // OnEnabled is a lifecycle event handler.
 func (job Job) OnEnabled(ctx context.Context) {
-	if job.Config.Notifications.OnEnabledOrDefault() {
+	job.sendStats(ctx, cron.FlagEnabled)
+	if job.JobConfig.Notifications.OnEnabledOrDefault() {
 		job.notify(ctx, cron.FlagEnabled)
 	}
 }
 
 // OnDisabled is a lifecycle event handler.
 func (job Job) OnDisabled(ctx context.Context) {
-	if job.Config.Notifications.OnDisabledOrDefault() {
+	job.sendStats(ctx, cron.FlagDisabled)
+	if job.JobConfig.Notifications.OnDisabledOrDefault() {
 		job.notify(ctx, cron.FlagDisabled)
 	}
 }
 
-// PersistHistory writes the history to disk.
-// It does so completely, overwriting any existing history file on disk with the complete history.
-func (job Job) PersistHistory(ctx context.Context, log []cron.JobInvocation) error {
-	if job.HistoryProvider != nil {
-		return job.HistoryProvider.PersistHistory(ctx, log)
-	}
-	return nil
-}
-
-// RestoreHistory restores history from disk.
-func (job Job) RestoreHistory(ctx context.Context) (output []cron.JobInvocation, err error) {
-	if job.HistoryProvider != nil {
-		output, err = job.HistoryProvider.RestoreHistory(ctx)
-		return
-	}
-	return
-}
-
 // Execute is the job body.
 func (job Job) Execute(ctx context.Context) error {
-	return job.Action(ctx)
+	return job.Job.Execute(ctx)
 }
 
 //
@@ -245,22 +294,14 @@ func (job Job) Execute(ctx context.Context) error {
 // Debugf logs a debug message if the logger is set.
 func (job Job) Debugf(ctx context.Context, format string, args ...interface{}) {
 	if job.Log != nil {
-		if ji := cron.GetJobInvocation(ctx); ji != nil {
-			job.Log.WithPath("cron", job.Name(), ji.ID).WithContext(ctx).Debugf(format, args...)
-		} else {
-			job.Log.WithPath("cron", job.Name()).WithContext(ctx).Debugf(format, args...)
-		}
+		job.Log.WithContext(ctx).Debugf(format, args...)
 	}
 }
 
 // Error logs an error if the logger i set.
 func (job Job) Error(ctx context.Context, err error) error {
 	if job.Log != nil && err != nil {
-		if ji := cron.GetJobInvocation(ctx); ji != nil {
-			job.Log.WithPath("cron", job.Name(), ji.ID).WithContext(ctx).Error(err)
-		} else {
-			job.Log.WithPath("cron", job.Name()).WithContext(ctx).Error(err)
-		}
+		job.Log.WithContext(ctx).Error(err)
 	}
 	return err
 
@@ -270,12 +311,12 @@ func (job Job) Error(ctx context.Context, err error) error {
 // private utility methods
 //
 
-func (job Job) stats(ctx context.Context, flag string) {
+func (job Job) sendStats(ctx context.Context, flag string) {
 	if job.StatsClient != nil {
 		job.StatsClient.Increment(string(flag), fmt.Sprintf("%s:%s", stats.TagJob, job.Name()))
 		if ji := cron.GetJobInvocation(ctx); ji != nil {
 			job.Debugf(ctx, "stats; sending stats to collector")
-			job.Error(ctx, job.StatsClient.TimeInMilliseconds(string(flag), ji.Elapsed, fmt.Sprintf("%s:%s", stats.TagJob, job.Name())))
+			job.Error(ctx, job.StatsClient.TimeInMilliseconds(string(flag), ji.Elapsed(), fmt.Sprintf("%s:%s", stats.TagJob, job.Name())))
 		}
 	} else {
 		job.Debugf(ctx, "stats; client unset, skipping logging stats")
@@ -359,4 +400,112 @@ func (job *Job) notify(ctx context.Context, flag string) {
 	} else {
 		job.Debugf(ctx, "notify (webhook); sender unset, skipping sending webhook notification")
 	}
+}
+
+//
+// history utils
+//
+
+// RestoreHistory calls the persist handler if it's set.
+func (job *Job) RestoreHistory(ctx context.Context) error {
+	if !js.JobConfig.HistoryPersistenceEnabledOrDefault() {
+		return nil
+	}
+
+	historyProvider, ok := job.Job.(HistoryProvider)
+	if !ok {
+		return nil
+	}
+
+	job.HistoryMux.Lock()
+	defer job.HistoryMux.Unlock()
+	var err error
+	if js.History, err = historyProvider.RestoreHistory(ctx); err != nil {
+		return js.error(err)
+	}
+	if len(js.History) > 0 {
+		js.Last = &js.History[len(js.History)-1]
+	}
+	return nil
+}
+
+// PersistHistory calls the persist handler if it's set.
+func (job *Job) PersistHistory(ctx context.Context) error {
+	if !js.HistoryEnabled() {
+		return nil
+	}
+	if !js.HistoryPersistenceEnabled() {
+		return nil
+	}
+
+	historyProvider, ok := js.Job.(HistoryProvider)
+	if !ok {
+		return nil
+	}
+	job.HistoryMux.Lock()
+	defer job.HistoryMux.Unlock()
+
+	historyCopy := make([]JobInvocation, len(job.History))
+	copy(historyCopy, job.History)
+	if err := historyProvider.PersistHistory(ctx, historyCopy); err != nil {
+		return job.error(ctx, err)
+	}
+	return nil
+}
+
+func (job *Job) CullHistory() []JobInvocation {
+	count := len(job.History)
+	maxCount := js.HistoryMaxCount()
+	maxAge := js.HistoryMaxAge()
+
+	now := time.Now().UTC()
+	var filtered []JobInvocation
+	for index, h := range job.History {
+		if maxCount > 0 {
+			if index < (count - maxCount) {
+				continue
+			}
+		}
+		if maxAge > 0 {
+			if now.Sub(h.Started) > maxAge {
+				continue
+			}
+		}
+		filtered = append(filtered, h)
+	}
+	return filtered
+}
+
+// Stats returns job stats.
+func (job *Job) Stats() JobStats {
+	output := JobStats{
+		Name:      job.Name(),
+		RunsTotal: len(job.History),
+	}
+
+	var elapsedTimes []time.Duration
+	for _, ji := range job.History {
+		switch ji.State {
+		case cron.JobInvocationStatusSuccess:
+			output.RunsSuccessful++
+		case cron.JobInvocationStatusErrored:
+			output.RunsErrored++
+		case cron.JobInvocationStatusCancelled:
+			output.RunsCancelled++
+		}
+
+		elapsedTimes = append(elapsedTimes, ji.Elapsed())
+		if ji.Elapsed() > output.ElapsedMax {
+			output.ElapsedMax = ji.Elapsed()
+		}
+		if ji.Output != nil {
+			output.OutputBytes += len(ji.Output.Bytes())
+		}
+	}
+	if output.RunsTotal > 0 {
+		output.SuccessRate = float64(output.RunsSuccessful) / float64(output.RunsTotal)
+	}
+	output.Elapsed50th = mathutil.PercentileOfDuration(elapsedTimes, 50.0)
+	output.Elapsed95th = mathutil.PercentileOfDuration(elapsedTimes, 95.0)
+	return output
 }

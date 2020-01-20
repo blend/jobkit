@@ -1,17 +1,40 @@
 package jobkit
 
+import "time"
+
 // JobConfig is something you can use to give your jobs some knobs to turn
 // from configuration.
 // You can use this job config by embedding it into your larger job config struct.
 type JobConfig struct {
 	Name string `yaml:"name"`
-	// HistoryPath is the base path we should write job history to.
-	// The files for each job will always be $HISTORY_PATH/$NAME.json
-	HistoryPath string `yaml:"historyPath"`
-	// Parameters are optional inputs for jobs.
+
+	HistoryDisabled            *bool          `yaml:"historyDisabled"`
+	HistoryPersistenceDisabled *bool          `yaml:"historyDisabled"`
+	HistoryPath                string         `yaml:"historyPath"`
+	HistoryMaxAge              *time.Duration `yaml:"historyMaxAge"`
+	HistoryMaxCount            *int           `yaml:"historyMaxCount"`
+
+	// Parameters are inputs for jobs.
+	// They can be set with defaults, or overriden per invocation in the ui.
 	Parameters []Parameter `yaml:"parameters"`
 	// Notifications hold options for notifications.
 	Notifications JobNotificationsConfig `yaml:"notifications"`
+}
+
+// HistoryDisabledOrDefault returns a value or a default.
+func (jc JobConfig) HistoryDisabledOrDefault() bool {
+	if jc.HistoryDisabled != nil {
+		return *jc.HistoryDisabled
+	}
+	return false
+}
+
+// HistoryDisabledOrDefault returns a value or a default.
+func (jc JobConfig) HistoryPersistenceDisabledOrDefault() bool {
+	if jc.HistoryPersistenceDisabled != nil {
+		return *jc.HistoryPersistenceDisabled
+	}
+	return false
 }
 
 // HistoryPathOrDefault returns a value or a default.
@@ -22,26 +45,18 @@ func (jc JobConfig) HistoryPathOrDefault() string {
 	return DefaultHistoryPath
 }
 
-// SkipExpandEnvOrDefault returns a value or a default.
-func (jc JobConfig) SkipExpandEnvOrDefault() bool {
-	if jc.SkipExpandEnv != nil {
-		return *jc.SkipExpandEnv
+// HistoryMaxCountOrDefault returns a value or a default.
+func (jc JobConfig) HistoryMaxCountOrDefault() int {
+	if jc.HistoryMaxCount != nil {
+		return *jc.HistoryMaxCount
 	}
-	return DefaultSkipExpandEnv
+	return DefaultHistoryMaxCount
 }
 
-// DiscardOutputOrDefault returns a value or a default.
-func (jc JobConfig) DiscardOutputOrDefault() bool {
-	if jc.DiscardOutput != nil {
-		return *jc.DiscardOutput
+// HistoryMaxAgeOrDefault returns a value or a default.
+func (jc JobConfig) HistoryMaxAgeOrDefault() time.Duration {
+	if jc.HistoryMaxAge != nil {
+		return *jc.HistoryMaxAge
 	}
-	return DefaultDiscardOutput
-}
-
-// HideOutputOrDefault returns a value or a default.
-func (jc JobConfig) HideOutputOrDefault() bool {
-	if jc.HideOutput != nil {
-		return *jc.HideOutput
-	}
-	return DefaultHideOutput
+	return DefaultHistoryMaxAge
 }
