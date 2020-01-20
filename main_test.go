@@ -62,20 +62,23 @@ func createTestCompleteJobInvocation(jobName string, elapsed time.Duration) cron
 	}
 }
 
-func createTestFailedJobInvocation(jobName string, elapsed time.Duration, err error) cron.JobInvocation {
-	return cron.JobInvocation{
-		ID:       uuid.V4().String(),
-		JobName:  jobName,
-		Started:  time.Now().UTC(),
-		Finished: time.Now().UTC().Add(elapsed),
-		State:    cron.JobInvocationStateFailed,
-		Elapsed:  elapsed,
-		Err:      err,
+func createTestFailedJobInvocation(jobName string, elapsed time.Duration, err error) JobInvocation {
+	ts := time.Now().UTC()
+	return JobInvocation{
+		JobInvocation: cron.JobInvocation{
+			ID:       uuid.V4().String(),
+			JobName:  jobName,
+			Started:  ts,
+			Complete: ts.Add(elapsed),
+			Status:   cron.JobInvocationStatusErrored,
+			Err:      err,
+		},
 		Output: &bufferutil.Buffer{
 			Chunks: []bufferutil.BufferChunk{
 				createTestBufferChunk(0),
 				createTestBufferChunk(1),
 			},
+		},
 		},
 	}
 }

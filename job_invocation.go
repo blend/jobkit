@@ -5,7 +5,7 @@ import (
 	"github.com/blend/go-sdk/cron"
 )
 
-// JobInvocation is a wrapping job invocation.
+// JobInvocation is a serialized form of a job invocation.
 type JobInvocation struct {
 	cron.JobInvocation
 

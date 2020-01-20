@@ -30,7 +30,7 @@ func NewSlackMessage(flag string, defaults slack.Message, ji *cron.JobInvocation
 		)
 	}
 
-	if ji.Elapsed > 0 {
+	if ji.Elapsed() > 0 {
 		message.Attachments = append(message.Attachments,
 			slack.MessageAttachment{
 				Text: fmt.Sprintf("%v elapsed", ji.Elapsed),
