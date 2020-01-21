@@ -14,15 +14,15 @@ func NewEmailMessage(flag string, emailDefaults email.Message, ji *JobInvocation
 
 	vars := map[string]interface{}{
 		"flag":    flag,
-		"jobName": ji.JobName,
-		"status":  ji.Status,
-		"err":     ji.Err,
+		"jobName": ji.JobInvocation.JobName,
+		"status":  ji.JobInvocation.Status,
+		"err":     ji.JobInvocation.Err,
 	}
-	if ji.Elapsed() > 0 {
-		vars["elapsed"] = ji.Elapsed().String()
+	if ji.JobInvocation.Elapsed() > 0 {
+		vars["elapsed"] = ji.JobInvocation.Elapsed().String()
 	}
-	if ji.Output != nil && len(ji.Output.Chunks) > 0 {
-		vars["output"] = ji.Output.String()
+	if ji.JobInvocationOutput.Output != nil && len(ji.JobInvocationOutput.Output.Chunks) > 0 {
+		vars["output"] = ji.JobInvocationOutput.Output.String()
 	}
 
 	var err error

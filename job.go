@@ -34,9 +34,9 @@ func NewJob(inner cron.Job, options ...JobOption) (*Job, error) {
 	job := &Job{
 		Job: inner,
 	}
-	job.NotificationsEmail = NewRetryQueue(job.notifyEmail, retryQueueOptions...)
-	job.NotificationsSlack = NewRetryQueue(job.notifySlack, retryQueueOptions...)
-	job.NotificationsWebhook = NewRetryQueue(job.notifyWebhook, retryQueueOptions...)
+	job.NotificationsQueueEmail = NewRetryQueue(job.notifyEmail, retryQueueOptions...)
+	job.NotificationsQueueSlack = NewRetryQueue(job.notifySlack, retryQueueOptions...)
+	job.NotificationsQueueWebhook = NewRetryQueue(job.notifyWebhook, retryQueueOptions...)
 
 	var err error
 	for _, opt := range options {
@@ -66,9 +66,9 @@ type Job struct {
 	SentryClient sentry.Sender
 	EmailClient  email.Sender
 
-	NotificationsEmail   *RetryQueue
-	NotificationsSlack   *RetryQueue
-	NotificationsWebhook *RetryQueue
+	NotificationsQueueEmail   *RetryQueue
+	NotificationsQueueSlack   *RetryQueue
+	NotificationsQueueWebhook *RetryQueue
 
 	HistoryMux sync.Mutex
 	History    []JobInvocation
@@ -187,26 +187,26 @@ func (job Job) Lifecycle() (output cron.JobLifecycle) {
 // OnLoad implements job on load handler.
 func (job Job) OnLoad() error {
 	logger.MaybeDebugf(job.Log, "starting retry queue workers")
-	job.NotificationsEmail.Log = job.Log
-	go job.NotificationsEmail.Start()
-	<-job.NotificationsEmail.NotifyStarted()
+	job.NotificationsQueueEmail.Log = job.Log
+	go job.NotificationsQueueEmail.Start()
+	<-job.NotificationsQueueEmail.NotifyStarted()
 
-	job.NotificationsSlack.Log = job.Log
-	go job.NotificationsSlack.Start()
-	<-job.NotificationsSlack.NotifyStarted()
+	job.NotificationsQueueSlack.Log = job.Log
+	go job.NotificationsQueueSlack.Start()
+	<-job.NotificationsQueueSlack.NotifyStarted()
 
-	job.NotificationsWebhook.Log = job.Log
-	go job.NotificationsWebhook.Start()
-	<-job.NotificationsWebhook.NotifyStarted()
+	job.NotificationsQueueWebhook.Log = job.Log
+	go job.NotificationsQueueWebhook.Start()
+	<-job.NotificationsQueueWebhook.NotifyStarted()
 
 	return nil
 }
 
 // OnUnload implements job on unload handler.
 func (job Job) OnUnload() error {
-	job.NotificationsEmail.Stop()
-	job.NotificationsSlack.Stop()
-	job.NotificationsWebhook.Stop()
+	job.NotificationsQueueEmail.Stop()
+	job.NotificationsQueueSlack.Stop()
+	job.NotificationsQueueWebhook.Stop()
 	return nil
 }
 
@@ -359,9 +359,9 @@ func (job *Job) notify(ctx context.Context, flag string) {
 	if job.SlackClient != nil {
 		if ji := cron.GetJobInvocation(ctx); ji != nil {
 			message := NewSlackMessage(flag, job.SlackDefaults, ji)
-			if job.NotificationsSlack != nil && job.NotificationsSlack.Latch.IsStarted() {
+			if job.NotificationsQueueSlack != nil && job.NotificationsQueueSlack.Latch.IsStarted() {
 				job.Debugf(ctx, "notify (slack); queueing slack notification")
-				job.NotificationsSlack.Add(ctx, message)
+				job.NotificationsQueueSlack.Add(ctx, message)
 			} else {
 				job.Debugf(ctx, "notify (slack); sending slack notification")
 				job.Error(ctx, job.SlackClient.Send(ctx, message))
@@ -378,9 +378,9 @@ func (job *Job) notify(ctx context.Context, flag string) {
 				job.Error(ctx, err)
 			}
 
-			if job.NotificationsEmail != nil && job.NotificationsEmail.Latch.IsStarted() {
+			if job.NotificationsQueueEmail != nil && job.NotificationsQueueEmail.Latch.IsStarted() {
 				job.Debugf(ctx, "notify (email); queueing email notification")
-				job.NotificationsEmail.Add(ctx, message)
+				job.NotificationsQueueEmail.Add(ctx, message)
 			} else {
 				job.Debugf(ctx, "notify (email); sending email notification")
 				job.Error(ctx, job.EmailClient.Send(ctx, message))
@@ -391,9 +391,9 @@ func (job *Job) notify(ctx context.Context, flag string) {
 	}
 
 	if !job.WebhookDefaults.IsZero() {
-		if job.NotificationsEmail != nil && job.NotificationsEmail.Latch.IsStarted() {
+		if job.NotificationsQueueEmail != nil && job.NotificationsQueueEmail.Latch.IsStarted() {
 			job.Debugf(ctx, "notify (webhook); queueing webhook notification")
-			job.NotificationsWebhook.Add(ctx, flag)
+			job.NotificationsQueueWebhook.Add(ctx, flag)
 		} else {
 			job.Error(ctx, job.notifyWebhook(ctx, flag))
 		}
@@ -408,7 +408,10 @@ func (job *Job) notify(ctx context.Context, flag string) {
 
 // RestoreHistory calls the persist handler if it's set.
 func (job *Job) RestoreHistory(ctx context.Context) error {
-	if !js.JobConfig.HistoryPersistenceEnabledOrDefault() {
+	if job.JobConfig.HistoryDisabledOrDefault() {
+		return nil
+	}
+	if job.JobConfig.HistoryPersistenceDisabledOrDefault() {
 		return nil
 	}
 
@@ -420,21 +423,18 @@ func (job *Job) RestoreHistory(ctx context.Context) error {
 	job.HistoryMux.Lock()
 	defer job.HistoryMux.Unlock()
 	var err error
-	if js.History, err = historyProvider.RestoreHistory(ctx); err != nil {
-		return js.error(err)
-	}
-	if len(js.History) > 0 {
-		js.Last = &js.History[len(js.History)-1]
+	if job.History, err = historyProvider.RestoreHistory(ctx); err != nil {
+		return job.Error(ctx, err)
 	}
 	return nil
 }
 
 // PersistHistory calls the persist handler if it's set.
 func (job *Job) PersistHistory(ctx context.Context) error {
-	if !js.HistoryEnabled() {
+	if !js.JobConfig.HistoryDisabledOrDefault() {
 		return nil
 	}
-	if !js.HistoryPersistenceEnabled() {
+	if !js.JobConfig.HistoryPersistenceDisabledOrDefault() {
 		return nil
 	}
 
