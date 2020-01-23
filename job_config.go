@@ -6,19 +6,16 @@ import "time"
 // from configuration.
 // You can use this job config by embedding it into your larger job config struct.
 type JobConfig struct {
-	Name string `yaml:"name"`
+	Name     string `yaml:"name"`
+	Schedule string `yaml:"schedule"`
 
-	HistoryDisabled            *bool          `yaml:"historyDisabled"`
-	HistoryPersistenceDisabled *bool          `yaml:"historyDisabled"`
-	HistoryPath                string         `yaml:"historyPath"`
-	HistoryMaxAge              *time.Duration `yaml:"historyMaxAge"`
-	HistoryMaxCount            *int           `yaml:"historyMaxCount"`
-
-	// Parameters are inputs for jobs.
-	// They can be set with defaults, or overriden per invocation in the ui.
-	Parameters []Parameter `yaml:"parameters"`
-	// Notifications hold options for notifications.
-	Notifications JobNotificationsConfig `yaml:"notifications"`
+	HistoryDisabled            *bool                  `yaml:"historyDisabled"`
+	HistoryPersistenceDisabled *bool                  `yaml:"historyDisabled"`
+	HistoryPath                string                 `yaml:"historyPath"`
+	HistoryMaxAge              *time.Duration         `yaml:"historyMaxAge"`
+	HistoryMaxCount            *int                   `yaml:"historyMaxCount"`
+	Parameters                 []Parameter            `yaml:"parameters"`
+	Notifications              JobNotificationsConfig `yaml:"notifications"`
 }
 
 // HistoryDisabledOrDefault returns a value or a default.
@@ -29,7 +26,7 @@ func (jc JobConfig) HistoryDisabledOrDefault() bool {
 	return false
 }
 
-// HistoryDisabledOrDefault returns a value or a default.
+// HistoryPersistenceDisabledOrDefault returns a value or a default.
 func (jc JobConfig) HistoryPersistenceDisabledOrDefault() bool {
 	if jc.HistoryPersistenceDisabled != nil {
 		return *jc.HistoryPersistenceDisabled

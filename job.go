@@ -26,18 +26,10 @@ var (
 )
 
 // NewJob returns a new job.
-func NewJob(inner cron.Job, options ...JobOption) (*Job, error) {
-	retryQueueOptions := []RetryQueueOption{
-		OptRetryQueueMaxAttempts(5),
-		OptRetryQueueRetryWaitBackoff(5 * time.Second),
-	}
+func NewJob(wrapped cron.Job, options ...JobOption) (*Job, error) {
 	job := &Job{
-		Job: inner,
+		Job: wrapped,
 	}
-	job.NotificationsQueueEmail = NewRetryQueue(job.notifyEmail, retryQueueOptions...)
-	job.NotificationsQueueSlack = NewRetryQueue(job.notifySlack, retryQueueOptions...)
-	job.NotificationsQueueWebhook = NewRetryQueue(job.notifyWebhook, retryQueueOptions...)
-
 	var err error
 	for _, opt := range options {
 		if err = opt(job); err != nil {
@@ -52,8 +44,9 @@ type JobOption func(*Job) error
 
 // Job is the main job body.
 type Job struct {
-	Job       cron.Job
-	JobConfig JobConfig
+	Job         cron.Job
+	JobConfig   JobConfig
+	JobSchedule cron.Schedule
 
 	Log         logger.Log
 	StatsClient stats.Collector
@@ -70,8 +63,9 @@ type Job struct {
 	NotificationsQueueSlack   *RetryQueue
 	NotificationsQueueWebhook *RetryQueue
 
-	HistoryMux sync.Mutex
-	History    []JobInvocation
+	HistoryMux      sync.Mutex
+	History         []JobInvocation
+	HistoryProvider HistoryProvider
 }
 
 // Name returns the job name.
@@ -84,10 +78,10 @@ func (job Job) Schedule() cron.Schedule {
 	if typed, ok := job.Job.(cron.ScheduleProvider); ok {
 		return typed.Schedule()
 	}
-	return nil
+	return job.JobSchedule
 }
 
-// JobConfig implements job config provider.
+// Config implements job config provider.
 func (job Job) Config() cron.JobConfig {
 	var cfg cron.JobConfig
 	if typed, ok := job.Job.(cron.ConfigProvider); ok {
@@ -187,14 +181,17 @@ func (job Job) Lifecycle() (output cron.JobLifecycle) {
 // OnLoad implements job on load handler.
 func (job Job) OnLoad() error {
 	logger.MaybeDebugf(job.Log, "starting retry queue workers")
+	job.NotificationsQueueEmail = NewRetryQueue(job.notifyEmail)
 	job.NotificationsQueueEmail.Log = job.Log
 	go job.NotificationsQueueEmail.Start()
 	<-job.NotificationsQueueEmail.NotifyStarted()
 
+	job.NotificationsQueueSlack = NewRetryQueue(job.notifySlack)
 	job.NotificationsQueueSlack.Log = job.Log
 	go job.NotificationsQueueSlack.Start()
 	<-job.NotificationsQueueSlack.NotifyStarted()
 
+	job.NotificationsQueueWebhook = NewRetryQueue(job.notifyWebhook)
 	job.NotificationsQueueWebhook.Log = job.Log
 	go job.NotificationsQueueWebhook.Start()
 	<-job.NotificationsQueueWebhook.NotifyStarted()
@@ -234,7 +231,7 @@ func (job Job) OnComplete(ctx context.Context) {
 	}
 }
 
-// OnFailure is a lifecycle event handler.
+// OnError is a lifecycle event handler.
 func (job Job) OnError(ctx context.Context) {
 	job.sendStats(ctx, cron.FlagErrored)
 	if job.JobConfig.Notifications.OnErrorOrDefault() {
@@ -356,9 +353,13 @@ func (job *Job) notifyWebhook(ctx context.Context, _ interface{}) error {
 }
 
 func (job *Job) notify(ctx context.Context, flag string) {
+	ji := cron.GetJobInvocation(ctx)
+	jio := GetJobInvocationOutput(ctx)
+	invocation := NewJobInvocation(ji, jio)
+
 	if job.SlackClient != nil {
-		if ji := cron.GetJobInvocation(ctx); ji != nil {
-			message := NewSlackMessage(flag, job.SlackDefaults, ji)
+		if ji != nil {
+			message := NewSlackMessage(flag, job.SlackDefaults, invocation)
 			if job.NotificationsQueueSlack != nil && job.NotificationsQueueSlack.Latch.IsStarted() {
 				job.Debugf(ctx, "notify (slack); queueing slack notification")
 				job.NotificationsQueueSlack.Add(ctx, message)
@@ -372,12 +373,11 @@ func (job *Job) notify(ctx context.Context, flag string) {
 	}
 
 	if job.EmailClient != nil {
-		if ji := cron.GetJobInvocation(ctx); ji != nil {
-			message, err := NewEmailMessage(flag, job.EmailDefaults, ji)
+		if ji != nil {
+			message, err := NewEmailMessage(flag, job.EmailDefaults, invocation)
 			if err != nil {
 				job.Error(ctx, err)
 			}
-
 			if job.NotificationsQueueEmail != nil && job.NotificationsQueueEmail.Latch.IsStarted() {
 				job.Debugf(ctx, "notify (email); queueing email notification")
 				job.NotificationsQueueEmail.Add(ctx, message)
@@ -431,32 +431,33 @@ func (job *Job) RestoreHistory(ctx context.Context) error {
 
 // PersistHistory calls the persist handler if it's set.
 func (job *Job) PersistHistory(ctx context.Context) error {
-	if !js.JobConfig.HistoryDisabledOrDefault() {
+	if !job.JobConfig.HistoryDisabledOrDefault() {
 		return nil
 	}
-	if !js.JobConfig.HistoryPersistenceDisabledOrDefault() {
+	if !job.JobConfig.HistoryPersistenceDisabledOrDefault() {
 		return nil
 	}
 
-	historyProvider, ok := js.Job.(HistoryProvider)
-	if !ok {
+	if job.HistoryProvider == nil {
 		return nil
 	}
+
 	job.HistoryMux.Lock()
 	defer job.HistoryMux.Unlock()
 
 	historyCopy := make([]JobInvocation, len(job.History))
 	copy(historyCopy, job.History)
-	if err := historyProvider.PersistHistory(ctx, historyCopy); err != nil {
-		return job.error(ctx, err)
+	if err := job.HistoryProvider.PersistHistory(ctx, historyCopy); err != nil {
+		return job.Error(ctx, err)
 	}
 	return nil
 }
 
+// CullHistory culls history after the job completes, but before we persist history.
 func (job *Job) CullHistory() []JobInvocation {
 	count := len(job.History)
-	maxCount := js.HistoryMaxCount()
-	maxAge := js.HistoryMaxAge()
+	maxCount := job.JobConfig.HistoryMaxCountOrDefault()
+	maxAge := job.JobConfig.HistoryMaxAgeOrDefault()
 
 	now := time.Now().UTC()
 	var filtered []JobInvocation
@@ -467,7 +468,7 @@ func (job *Job) CullHistory() []JobInvocation {
 			}
 		}
 		if maxAge > 0 {
-			if now.Sub(h.Started) > maxAge {
+			if now.Sub(h.JobInvocation.Started) > maxAge {
 				continue
 			}
 		}
@@ -485,7 +486,7 @@ func (job *Job) Stats() JobStats {
 
 	var elapsedTimes []time.Duration
 	for _, ji := range job.History {
-		switch ji.State {
+		switch ji.JobInvocation.Status {
 		case cron.JobInvocationStatusSuccess:
 			output.RunsSuccessful++
 		case cron.JobInvocationStatusErrored:
@@ -494,12 +495,12 @@ func (job *Job) Stats() JobStats {
 			output.RunsCancelled++
 		}
 
-		elapsedTimes = append(elapsedTimes, ji.Elapsed())
-		if ji.Elapsed() > output.ElapsedMax {
-			output.ElapsedMax = ji.Elapsed()
+		elapsedTimes = append(elapsedTimes, ji.JobInvocation.Elapsed())
+		if ji.JobInvocation.Elapsed() > output.ElapsedMax {
+			output.ElapsedMax = ji.JobInvocation.Elapsed()
 		}
-		if ji.Output != nil {
-			output.OutputBytes += len(ji.Output.Bytes())
+		if ji.JobInvocationOutput.Output != nil {
+			output.OutputBytes += len(ji.JobInvocationOutput.Output.Bytes())
 		}
 	}
 	if output.RunsTotal > 0 {

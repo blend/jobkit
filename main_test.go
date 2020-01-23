@@ -46,11 +46,11 @@ func createTestCompleteJobInvocation(jobName string, elapsed time.Duration) JobI
 	ts := time.Now().UTC()
 	return JobInvocation{
 		JobInvocation: cron.JobInvocation{
-		ID:       uuid.V4().String(),
-		JobName:  jobName,
-		Started:  ts,
-		Finished: ts.Add(elapsed),
-		State:    cron.JobInvocationStateComplete,
+			ID:       uuid.V4().String(),
+			JobName:  jobName,
+			Started:  ts,
+			Complete: ts.Add(elapsed),
+			Status:   cron.JobInvocationStatusSuccess,
 		},
 		Output: &bufferutil.Buffer{
 			Chunks: []bufferutil.BufferChunk{
@@ -75,12 +75,13 @@ func createTestFailedJobInvocation(jobName string, elapsed time.Duration, err er
 			Status:   cron.JobInvocationStatusErrored,
 			Err:      err,
 		},
-		Output: &bufferutil.Buffer{
-			Chunks: []bufferutil.BufferChunk{
-				createTestBufferChunk(0),
-				createTestBufferChunk(1),
+		JobInvocationOutput: JobInvocationOutput{
+			Output: &bufferutil.Buffer{
+				Chunks: []bufferutil.BufferChunk{
+					createTestBufferChunk(0),
+					createTestBufferChunk(1),
+				},
 			},
-		},
 		},
 	}
 }

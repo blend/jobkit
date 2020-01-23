@@ -17,6 +17,6 @@ func TestShellAction(t *testing.T) {
 	os.Setenv(envVar, envValue)
 	defer os.Unsetenv(envVar)
 
-	action := ShellAction([]string{"sh", fmt.Sprintf("$%s/foo", envVar)})
+	action := NewShellAction([]string{"sh", fmt.Sprintf("$%s/foo", envVar)})
 	assert.NotNil(action)
 }

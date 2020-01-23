@@ -22,10 +22,12 @@ func TestNewEmailMessage(t *testing.T) {
 			Started:  ts,
 			Complete: ts.Add(time.Millisecond),
 		},
-		Output: &bufferutil.Buffer{
-			Chunks: []bufferutil.BufferChunk{
-				{Data: []byte("this is a test")},
-				{Data: []byte("this is another test")},
+		JobInvocationOutput: JobInvocationOutput{
+			Output: &bufferutil.Buffer{
+				Chunks: []bufferutil.BufferChunk{
+					{Data: []byte("this is a test")},
+					{Data: []byte("this is another test")},
+				},
 			},
 		},
 	},

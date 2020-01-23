@@ -11,12 +11,22 @@ import (
 	"github.com/blend/go-sdk/sh"
 )
 
+// NewShellAction returns a new shell action.
+func NewShellAction(exec []string, opts ...ShellActionOption) ShellAction {
+	shellAction := ShellAction{
+		Exec: exec,
+	}
+	for _, opt := range opts {
+		opt(&shellAction)
+	}
+	return shellAction
+}
+
+// ShellActionOption is a mutator for a shell action.
+type ShellActionOption func(*ShellAction)
+
 // ShellAction captures options for a shell action.
 type ShellAction struct {
-	// Name is the name of the job.
-	Name string `yaml:"name"`
-	// Schedule is the job schedule in cron string form.
-	Schedule string `yaml:"schedule"`
 	// Exec is a job body that shells out for its action.
 	Exec []string `yaml:"exec"`
 	// SkipExpandEnv skips expanding environment variables in the exec segments.
@@ -68,7 +78,7 @@ func (se ShellAction) Execute(ctx context.Context) error {
 			if index == 0 {
 				continue
 			}
-			localExec[index] = os.Expand(arg, CreateParameterExpand(ji))
+			localExec[index] = os.Expand(arg, ExpandParameters(ji))
 		}
 	}
 
@@ -90,16 +100,4 @@ func (se ShellAction) Execute(ctx context.Context) error {
 		cmd.Stderr = os.Stderr
 	}
 	return ex.New(cmd.Run())
-}
-
-// CreateParameterExpand returns a new parameter expander for a given job invocation.
-func CreateParameterExpand(ji *cron.JobInvocation) func(string) string {
-	return func(name string) string {
-		if ji.Parameters != nil {
-			if value, ok := ji.Parameters[name]; ok {
-				return value
-			}
-		}
-		return os.Getenv(name)
-	}
 }

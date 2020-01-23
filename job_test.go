@@ -19,19 +19,10 @@ import (
 	"github.com/blend/go-sdk/uuid"
 )
 
-func scheduleProvider(schedule cron.Schedule) func() cron.Schedule {
-	return func() cron.Schedule {
-		return schedule
-	}
-}
-
 func TestNewJob(t *testing.T) {
 	assert := assert.New(t)
 
 	cfg := JobConfig{
-		JobConfig: cron.JobConfig{
-			Timeout: 2 * time.Second,
-		},
 		Schedule: "@every 1s",
 	}
 	var didCallAction bool
@@ -40,26 +31,17 @@ func TestNewJob(t *testing.T) {
 		return nil
 	}
 
-	job, err := NewJob(cfg, action, OptParsedSchedule("@every 2s"))
+	inner := cron.NewJob(cron.OptJobAction(action))
+
+	job, err := NewJob(inner,
+		OptParsedSchedule("@every 2s"),
+		OptConfig(cfg),
+	)
 	assert.Nil(err)
 	assert.NotNil(job)
 	assert.Equal(2*time.Second, job.CompiledSchedule.(cron.IntervalSchedule).Every)
-	assert.Nil(job.Action(context.Background()))
+	assert.Nil(job.Execute(context.Background()))
 	assert.True(didCallAction)
-}
-
-func TestWrapJob(t *testing.T) {
-	assert := assert.New(t)
-
-	job := cron.NewJob(
-		cron.OptJobName("test"),
-		cron.OptJobAction(func(_ context.Context) error {
-			return nil
-		}),
-	)
-	wrapped := WrapJob(job)
-	assert.Equal(wrapped.Name(), job.Name())
-	assert.NotNil(job.Action)
 }
 
 func TestJobLifecycleHooksNotificationsSlack(t *testing.T) {
@@ -73,7 +55,6 @@ func TestJobLifecycleHooksNotificationsSlack(t *testing.T) {
 	slackMessages := make(chan slack.Message, 16)
 
 	job := &Job{
-		Config:      JobConfig{},
 		SlackClient: slack.MockWebhookSender(slackMessages),
 	}
 
@@ -83,7 +64,7 @@ func TestJobLifecycleHooksNotificationsSlack(t *testing.T) {
 	job.OnComplete(ctx)
 	assert.Empty(slackMessages)
 
-	job.OnFailure(ctx)
+	job.OnError(ctx)
 	assert.NotEmpty(slackMessages)
 
 	job.OnCancellation(ctx)
@@ -204,11 +185,11 @@ func TestJobLifecycleHooksEmailNotifications(t *testing.T) {
 
 	job := &Job{
 		EmailClient: email.MockSender(emailMessages),
-		Config: JobConfig{
+		JobConfig: JobConfig{
 			Notifications: JobNotificationsConfig{
 				OnBegin:        ref.Bool(true),
 				OnComplete:     ref.Bool(true),
-				OnFailure:      ref.Bool(true),
+				OnError:        ref.Bool(true),
 				OnBroken:       ref.Bool(true),
 				OnFixed:        ref.Bool(true),
 				OnCancellation: ref.Bool(true),
@@ -218,7 +199,7 @@ func TestJobLifecycleHooksEmailNotifications(t *testing.T) {
 
 	job.OnBegin(ctx)
 	job.OnComplete(ctx)
-	job.OnFailure(ctx)
+	job.OnError(ctx)
 	job.OnCancellation(ctx)
 	job.OnBroken(ctx)
 	job.OnFixed(ctx)
