@@ -10,4 +10,9 @@ const (
 
 	DefaultHistoryMaxCount = 256
 	DefaultHistoryMaxAge   = 0
+
+	DefaultHistoryDisabled            = false
+	DefaultHistoryPersistenceDisabled = false
+
+	DefaultSchedule = "* */1 * * * * *"
 )

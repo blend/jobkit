@@ -39,6 +39,26 @@ func NewJob(wrapped cron.Job, options ...JobOption) (*Job, error) {
 	return job, nil
 }
 
+// OptJobConfig sets the job config.
+func OptJobConfig(cfg JobConfig) JobOption {
+	return func(job *Job) error {
+		job.JobConfig = cfg
+		return nil
+	}
+}
+
+// OptJobParsedSchedule sets the schedule to a parsed cron string.
+func OptJobParsedSchedule(schedule string) JobOption {
+	return func(job *Job) error {
+		schedule, err := cron.ParseString(schedule)
+		if err != nil {
+			return err
+		}
+		job.JobSchedule = schedule
+		return nil
+	}
+}
+
 // JobOption is a function that mutates a job.
 type JobOption func(*Job) error
 
@@ -50,6 +70,9 @@ type Job struct {
 
 	Log         logger.Log
 	StatsClient stats.Collector
+
+	Current *JobInvocation
+	Last    *JobInvocation
 
 	SlackDefaults   slack.Message
 	EmailDefaults   email.Message
@@ -182,12 +205,10 @@ func (job *Job) Lifecycle() (output cron.JobLifecycle) {
 
 // OnLoad implements job on load handler.
 func (job *Job) OnLoad() error {
-	logger.MaybeDebugf(job.Log, "on load: restoring history")
 	if err := job.RestoreHistory(context.Background()); err != nil {
 		return err
 	}
 
-	logger.MaybeDebugf(job.Log, "on load: starting retry queue workers")
 	job.NotificationsQueueEmail = NewRetryQueue(job.notifyEmail)
 	job.NotificationsQueueEmail.Log = job.Log
 	go job.NotificationsQueueEmail.Start()
@@ -215,7 +236,7 @@ func (job *Job) OnUnload() error {
 }
 
 // OnBegin is a lifecycle event handler.
-func (job Job) OnBegin(ctx context.Context) {
+func (job *Job) OnBegin(ctx context.Context) {
 	job.sendStats(ctx, cron.FlagBegin)
 	if job.JobConfig.Notifications.OnBeginOrDefault() {
 		job.notify(ctx, cron.FlagBegin)
@@ -223,7 +244,7 @@ func (job Job) OnBegin(ctx context.Context) {
 }
 
 // OnSuccess is a lifecycle event handler.
-func (job Job) OnSuccess(ctx context.Context) {
+func (job *Job) OnSuccess(ctx context.Context) {
 	job.sendStats(ctx, cron.FlagSuccess)
 	if job.JobConfig.Notifications.OnSuccessOrDefault() {
 		job.notify(ctx, cron.FlagSuccess)
@@ -231,7 +252,7 @@ func (job Job) OnSuccess(ctx context.Context) {
 }
 
 // OnComplete is a lifecycle event handler.
-func (job Job) OnComplete(ctx context.Context) {
+func (job *Job) OnComplete(ctx context.Context) {
 	job.sendStats(ctx, cron.FlagComplete)
 	if job.JobConfig.Notifications.OnCompleteOrDefault() {
 		job.notify(ctx, cron.FlagComplete)
@@ -239,7 +260,7 @@ func (job Job) OnComplete(ctx context.Context) {
 }
 
 // OnError is a lifecycle event handler.
-func (job Job) OnError(ctx context.Context) {
+func (job *Job) OnError(ctx context.Context) {
 	job.sendStats(ctx, cron.FlagErrored)
 	if job.JobConfig.Notifications.OnErrorOrDefault() {
 		job.notify(ctx, cron.FlagErrored)
@@ -247,7 +268,7 @@ func (job Job) OnError(ctx context.Context) {
 }
 
 // OnBroken is a lifecycle event handler.
-func (job Job) OnBroken(ctx context.Context) {
+func (job *Job) OnBroken(ctx context.Context) {
 	job.sendStats(ctx, cron.FlagBroken)
 	if job.JobConfig.Notifications.OnBrokenOrDefault() {
 		job.notify(ctx, cron.FlagBroken)
@@ -255,7 +276,7 @@ func (job Job) OnBroken(ctx context.Context) {
 }
 
 // OnFixed is a lifecycle event handler.
-func (job Job) OnFixed(ctx context.Context) {
+func (job *Job) OnFixed(ctx context.Context) {
 	job.sendStats(ctx, cron.FlagFixed)
 	if job.JobConfig.Notifications.OnFixedOrDefault() {
 		job.notify(ctx, cron.FlagFixed)
@@ -263,7 +284,7 @@ func (job Job) OnFixed(ctx context.Context) {
 }
 
 // OnCancellation is a lifecycle event handler.
-func (job Job) OnCancellation(ctx context.Context) {
+func (job *Job) OnCancellation(ctx context.Context) {
 	job.sendStats(ctx, cron.FlagCancelled)
 	if job.JobConfig.Notifications.OnCancellationOrDefault() {
 		job.notify(ctx, cron.FlagCancelled)
@@ -271,7 +292,7 @@ func (job Job) OnCancellation(ctx context.Context) {
 }
 
 // OnEnabled is a lifecycle event handler.
-func (job Job) OnEnabled(ctx context.Context) {
+func (job *Job) OnEnabled(ctx context.Context) {
 	job.sendStats(ctx, cron.FlagEnabled)
 	if job.JobConfig.Notifications.OnEnabledOrDefault() {
 		job.notify(ctx, cron.FlagEnabled)
@@ -279,7 +300,7 @@ func (job Job) OnEnabled(ctx context.Context) {
 }
 
 // OnDisabled is a lifecycle event handler.
-func (job Job) OnDisabled(ctx context.Context) {
+func (job *Job) OnDisabled(ctx context.Context) {
 	job.sendStats(ctx, cron.FlagDisabled)
 	if job.JobConfig.Notifications.OnDisabledOrDefault() {
 		job.notify(ctx, cron.FlagDisabled)
@@ -299,13 +320,16 @@ func (job *Job) GetJobInvocationByID(invocationID string) *JobInvocation {
 // Execute is the job body.
 func (job *Job) Execute(ctx context.Context) (err error) {
 	invocationOutput := NewJobInvocationOutput()
+
+	job.HistoryMux.Lock()
+	job.Current = NewJobInvocation(cron.GetJobInvocation(ctx), invocationOutput)
+	job.HistoryMux.Unlock()
+
 	ctx = WithJobInvocationOutput(ctx, invocationOutput)
 	if err = job.Job.Execute(ctx); err != nil {
 		return
 	}
-	job.AddHistory(NewJobInvocation(cron.GetJobInvocation(ctx), invocationOutput))
-	job.CullHistory()
-
+	job.AddHistoryResult()
 	if err = job.PersistHistory(ctx); err != nil {
 		return
 	}
@@ -317,14 +341,14 @@ func (job *Job) Execute(ctx context.Context) (err error) {
 //
 
 // Debugf logs a debug message if the logger is set.
-func (job Job) Debugf(ctx context.Context, format string, args ...interface{}) {
+func (job *Job) Debugf(ctx context.Context, format string, args ...interface{}) {
 	if job.Log != nil {
 		job.Log.WithContext(ctx).Debugf(format, args...)
 	}
 }
 
 // Error logs an error if the logger i set.
-func (job Job) Error(ctx context.Context, err error) error {
+func (job *Job) Error(ctx context.Context, err error) error {
 	if job.Log != nil && err != nil {
 		job.Log.WithContext(ctx).Error(err)
 	}
@@ -335,7 +359,7 @@ func (job Job) Error(ctx context.Context, err error) error {
 // private utility methods
 //
 
-func (job Job) sendStats(ctx context.Context, flag string) {
+func (job *Job) sendStats(ctx context.Context, flag string) {
 	if job.StatsClient != nil {
 		job.StatsClient.Increment(string(flag), fmt.Sprintf("%s:%s", stats.TagJob, job.Name()))
 		if ji := cron.GetJobInvocation(ctx); ji != nil {
@@ -447,6 +471,7 @@ func (job *Job) RestoreHistory(ctx context.Context) error {
 
 	job.HistoryMux.Lock()
 	defer job.HistoryMux.Unlock()
+	logger.MaybeDebugf(job.Log, "restoring history")
 	var err error
 	if job.History, err = job.HistoryProvider.RestoreHistory(ctx); err != nil {
 		return job.Error(ctx, err)
@@ -456,10 +481,10 @@ func (job *Job) RestoreHistory(ctx context.Context) error {
 
 // PersistHistory calls the persist handler if it's set.
 func (job *Job) PersistHistory(ctx context.Context) error {
-	if !job.JobConfig.HistoryDisabledOrDefault() {
+	if job.JobConfig.HistoryDisabledOrDefault() {
 		return nil
 	}
-	if !job.JobConfig.HistoryPersistenceDisabledOrDefault() {
+	if job.JobConfig.HistoryPersistenceDisabledOrDefault() {
 		return nil
 	}
 	if job.HistoryProvider == nil {
@@ -468,6 +493,7 @@ func (job *Job) PersistHistory(ctx context.Context) error {
 
 	job.HistoryMux.Lock()
 	defer job.HistoryMux.Unlock()
+	logger.MaybeDebugf(job.Log, "persisting history")
 
 	historyCopy := make([]*JobInvocation, len(job.History))
 	copy(historyCopy, job.History)
@@ -477,18 +503,17 @@ func (job *Job) PersistHistory(ctx context.Context) error {
 	return nil
 }
 
-// AddHistory adds an item to history.
-func (job *Job) AddHistory(ji *JobInvocation) {
-	job.HistoryMux.Lock()
-	job.History = append(job.History, ji)
-	job.HistoryLookup[ji.JobInvocation.ID] = ji
-	job.HistoryMux.Unlock()
-}
-
-// CullHistory culls history after the job completes, but before we persist history.
-func (job *Job) CullHistory() {
+// AddHistoryResult adds an item to history and culls old items.
+func (job *Job) AddHistoryResult() {
 	job.HistoryMux.Lock()
 	defer job.HistoryMux.Unlock()
+
+	ji := job.Current
+	job.Last = ji
+	job.Current = nil
+
+	job.History = append(job.History, ji)
+	job.HistoryLookup[ji.JobInvocation.ID] = ji
 
 	count := len(job.History)
 	maxCount := job.JobConfig.HistoryMaxCountOrDefault()
@@ -516,6 +541,7 @@ func (job *Job) CullHistory() {
 		delete(job.HistoryLookup, id)
 	}
 	job.History = filtered
+
 }
 
 // Stats returns job stats.

@@ -28,7 +28,7 @@ func TestManagmentServerGetRequestJob(t *testing.T) {
 	}
 
 	r := web.MockCtx("GET", "/job/test2+job.foo", web.OptCtxRouteParamValue("jobName", "test2+job.foo"))
-	job, res := ms.getRequestJob(r, web.Text)
+	job, res := ms.getRequestJobScheduler(r, web.Text)
 	assert.Nil(res)
 	assert.NotNil(job)
 	assert.Equal("test2 job.foo", job.Name())
@@ -42,11 +42,11 @@ func TestManagmentServerGetRequestJobInvocation(t *testing.T) {
 		Cron: jm,
 	}
 
-	job, err := jm.Job("test2 job.foo")
+	jobScheduler, err := jm.Job("test2 job.foo")
 	assert.Nil(err)
-	assert.NotNil(job)
-	invocation := job.History[2]
-	id := invocation.ID
+	assert.NotNil(jobScheduler)
+	invocation := jobScheduler.Job.(*Job).History[2]
+	id := invocation.JobInvocation.ID
 
 	r := web.MockCtx("GET", "/job.invocation/test2+job.foo/"+id,
 		web.OptCtxRouteParamValue("jobName", "test2+job.foo"),
@@ -55,8 +55,8 @@ func TestManagmentServerGetRequestJobInvocation(t *testing.T) {
 	found, res := ms.getRequestJobInvocation(r, web.Text)
 	assert.Nil(res)
 	assert.NotNil(found)
-	assert.Equal("test2 job.foo", found.JobName)
-	assert.Equal(id, found.ID)
+	assert.Equal("test2 job.foo", found.JobInvocation.JobName)
+	assert.Equal(id, found.JobInvocation.ID)
 }
 
 func TestManagementServerStatic(t *testing.T) {

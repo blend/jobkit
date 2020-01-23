@@ -11,13 +11,13 @@ jobs:
     labels:
       team: "bailey"
     schedule: "*/10 * * * *"
-    historyEnabled: true
-    historyPersistenceEnabled: false
+    historyDisabled: false
+    historyPersistenceDisabled: true
     notifications:
       retryWait: "5s"
       maxAttempts: 5
-      onComplete: true
-      onFailure: true
+      onSuccess: true
+      onError: true
       webhook:
         url: "http://localhost:8080/api/debug/error"
     exec:
