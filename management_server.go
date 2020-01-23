@@ -214,25 +214,25 @@ func (ms ManagementServer) getResume(r *web.Ctx) web.Result {
 
 // getJob is mapped to GET /job/:jobName
 func (ms ManagementServer) getJob(r *web.Ctx) web.Result {
-	job, result := ms.getRequestJob(r, web.JSON)
+	jobScheduler, result := ms.getRequestJobScheduler(r, web.JSON)
 	if result != nil {
 		return result
 	}
-	return r.Views.View("job", job)
+	return r.Views.View("job", jobScheduler)
 }
 
 // getJobParameters is mapped to GET /job.parameters/:jobName
 func (ms ManagementServer) getJobParameters(r *web.Ctx) web.Result {
-	jobScheduler, result := ms.getRequestJob(r, web.JSON)
+	jobScheduler, result := ms.getRequestJobScheduler(r, web.JSON)
 	if result != nil {
 		return result
 	}
 	job, ok := jobScheduler.Job.(*Job)
 	if !ok {
-		return web.Redirect("/job.run/" + jobScheduler.Name())
+		return r.Views.BadRequest(fmt.Errorf("provided job is not a jobkit job"))
 	}
 
-	parameters := job.Config.Parameters
+	parameters := job.JobConfig.Parameters
 	if len(parameters) == 0 {
 		return web.Redirect("/job.run/" + jobScheduler.Name())
 	}
@@ -241,7 +241,7 @@ func (ms ManagementServer) getJobParameters(r *web.Ctx) web.Result {
 
 // getJobRun is mapped to GET /job.run/:jobName
 func (ms ManagementServer) getJobRun(r *web.Ctx) web.Result {
-	jobScheduler, result := ms.getRequestJob(r, web.JSON)
+	jobScheduler, result := ms.getRequestJobScheduler(r, web.JSON)
 	if result != nil {
 		return result
 	}
@@ -257,7 +257,7 @@ func (ms ManagementServer) getJobRun(r *web.Ctx) web.Result {
 	if err := r.Request.ParseForm(); err != nil {
 		return r.Views.BadRequest(err)
 	}
-	parameters := job.Config.Parameters
+	parameters := job.JobConfig.Parameters
 	parameterValues := ParameterValuesFromForm(parameters, r.Request.Form)
 	ji, err := jobScheduler.RunAsyncContext(cron.WithJobParameters(context.Background(), parameterValues))
 	if err != nil {
@@ -268,11 +268,11 @@ func (ms ManagementServer) getJobRun(r *web.Ctx) web.Result {
 
 // getJobEnable is mapped to GET /job.enable/:jobName
 func (ms ManagementServer) getJobEnable(r *web.Ctx) web.Result {
-	job, result := ms.getRequestJob(r, web.JSON)
+	jobScheduler, result := ms.getRequestJobScheduler(r, web.JSON)
 	if result != nil {
 		return result
 	}
-	if err := ms.Cron.EnableJobs(job.Name()); err != nil {
+	if err := ms.Cron.EnableJobs(jobScheduler.Name()); err != nil {
 		return r.Views.BadRequest(err)
 	}
 	return web.RedirectWithMethod("GET", "/")
@@ -280,11 +280,11 @@ func (ms ManagementServer) getJobEnable(r *web.Ctx) web.Result {
 
 // getJobDisable is mapped to GET /job.disable/:jobName
 func (ms ManagementServer) getJobDisable(r *web.Ctx) web.Result {
-	job, result := ms.getRequestJob(r, web.JSON)
+	jobScheduler, result := ms.getRequestJobScheduler(r, web.JSON)
 	if result != nil {
 		return result
 	}
-	if err := ms.Cron.DisableJobs(job.Name()); err != nil {
+	if err := ms.Cron.DisableJobs(jobScheduler.Name()); err != nil {
 		return r.Views.BadRequest(err)
 	}
 	return web.RedirectWithMethod("GET", "/")
@@ -292,11 +292,11 @@ func (ms ManagementServer) getJobDisable(r *web.Ctx) web.Result {
 
 // getJobCancel is mapped to GET /job.cancel;/:jobName
 func (ms ManagementServer) getJobCancel(r *web.Ctx) web.Result {
-	job, result := ms.getRequestJob(r, web.JSON)
+	jobScheduler, result := ms.getRequestJobScheduler(r, web.JSON)
 	if result != nil {
 		return result
 	}
-	err := ms.Cron.CancelJob(job.Name())
+	err := ms.Cron.CancelJob(jobScheduler.Name())
 	if err != nil {
 		return r.Views.BadRequest(err)
 	}
@@ -340,25 +340,25 @@ func (ms ManagementServer) postAPIResume(r *web.Ctx) web.Result {
 
 // getAPIJob is mapped to GET /api/job/:jobName
 func (ms ManagementServer) getAPIJob(r *web.Ctx) web.Result {
-	job, result := ms.getRequestJob(r, web.JSON)
+	jobScheduler, result := ms.getRequestJobScheduler(r, web.JSON)
 	if result != nil {
 		return result
 	}
-	return web.JSON.Result(job.Status())
+	return web.JSON.Result(jobScheduler.Status())
 }
 
 // getAPIJobParameters is mapped to GET /api/job.parameters/:jobName
 func (ms ManagementServer) getAPIJobParameters(r *web.Ctx) web.Result {
-	job, result := ms.getRequestJob(r, web.JSON)
+	jobScheduler, result := ms.getRequestJobScheduler(r, web.JSON)
 	if result != nil {
 		return result
 	}
-	return web.JSON.Result(job.Job.(*Job).Config.Parameters)
+	return web.JSON.Result(jobScheduler.Job.(*Job).JobConfig.Parameters)
 }
 
 // postAPIJobRun is mapped to POST /api/job.run/:jobName
 func (ms ManagementServer) postAPIJobRun(r *web.Ctx) web.Result {
-	jobScheduler, result := ms.getRequestJob(r, web.JSON)
+	jobScheduler, result := ms.getRequestJobScheduler(r, web.JSON)
 	if result != nil {
 		return result
 	}
@@ -372,7 +372,7 @@ func (ms ManagementServer) postAPIJobRun(r *web.Ctx) web.Result {
 		return web.JSON.Result(ji)
 	}
 
-	parameters := job.Config.Parameters
+	parameters := job.JobConfig.Parameters
 	body, err := r.PostBody()
 	if err != nil {
 		return web.JSON.BadRequest(err)
@@ -393,11 +393,11 @@ func (ms ManagementServer) postAPIJobRun(r *web.Ctx) web.Result {
 
 // postAPIJobCancel is mapped to POST /api/job.cancel/:jobName
 func (ms ManagementServer) postAPIJobCancel(r *web.Ctx) web.Result {
-	job, result := ms.getRequestJob(r, web.JSON)
+	jobScheduler, result := ms.getRequestJobScheduler(r, web.JSON)
 	if result != nil {
 		return result
 	}
-	if err := ms.Cron.CancelJob(job.Name()); err != nil {
+	if err := ms.Cron.CancelJob(jobScheduler.Name()); err != nil {
 		return web.JSON.BadRequest(err)
 	}
 	return web.JSON.OK()
@@ -405,11 +405,11 @@ func (ms ManagementServer) postAPIJobCancel(r *web.Ctx) web.Result {
 
 // postAPIJobDisable is mapped to POST /api/job.disable/:jobName
 func (ms ManagementServer) postAPIJobDisable(r *web.Ctx) web.Result {
-	job, result := ms.getRequestJob(r, web.JSON)
+	jobScheduler, result := ms.getRequestJobScheduler(r, web.JSON)
 	if result != nil {
 		return result
 	}
-	if err := ms.Cron.DisableJobs(job.Name()); err != nil {
+	if err := ms.Cron.DisableJobs(jobScheduler.Name()); err != nil {
 		return web.JSON.BadRequest(err)
 	}
 	return web.JSON.OK()
@@ -417,14 +417,14 @@ func (ms ManagementServer) postAPIJobDisable(r *web.Ctx) web.Result {
 
 // postAPIJobEnable is mapped to POST /api/job.enable/:jobName
 func (ms ManagementServer) postAPIJobEnable(r *web.Ctx) web.Result {
-	job, result := ms.getRequestJob(r, web.JSON)
+	jobScheduler, result := ms.getRequestJobScheduler(r, web.JSON)
 	if result != nil {
 		return result
 	}
-	if err := ms.Cron.EnableJobs(job.Name()); err != nil {
+	if err := ms.Cron.EnableJobs(jobScheduler.Name()); err != nil {
 		return web.JSON.BadRequest(err)
 	}
-	return web.JSON.Result(fmt.Sprintf("%s enabled", job.Name()))
+	return web.JSON.Result(fmt.Sprintf("%s enabled", jobScheduler.Name()))
 }
 
 // getAPIJobInvocation is mapped to GET /api/job.invocation/:jobName/:id
@@ -548,7 +548,7 @@ func (ms ManagementServer) addContextStateConfig(action web.Action) web.Action {
 	}
 }
 
-func (ms ManagementServer) getRequestJob(r *web.Ctx, resultProvider web.ResultProvider) (*cron.JobScheduler, web.Result) {
+func (ms ManagementServer) getRequestJobScheduler(r *web.Ctx, resultProvider web.ResultProvider) (*cron.JobScheduler, web.Result) {
 	jobName, err := r.RouteParam("jobName")
 	if err != nil {
 		return nil, resultProvider.BadRequest(err)
@@ -565,8 +565,8 @@ func (ms ManagementServer) getRequestJob(r *web.Ctx, resultProvider web.ResultPr
 }
 
 // getRequestJobInvocation pulls a job invocation off a request context.
-func (ms ManagementServer) getRequestJobInvocation(r *web.Ctx, resultProvider web.ResultProvider) (*cron.JobInvocation, web.Result) {
-	job, result := ms.getRequestJob(r, resultProvider)
+func (ms ManagementServer) getRequestJobInvocation(r *web.Ctx, resultProvider web.ResultProvider) (*JobInvocation, web.Result) {
+	jobScheduler, result := ms.getRequestJobScheduler(r, resultProvider)
 	if result != nil {
 		return nil, result
 	}
@@ -576,14 +576,14 @@ func (ms ManagementServer) getRequestJobInvocation(r *web.Ctx, resultProvider we
 		return nil, resultProvider.BadRequest(err)
 	}
 
-	if invocationID == "current" && job.Current != nil {
-		return job.Current, nil
+	if invocationID == "current" && jobScheduler.Current != nil {
+		return jobScheduler.Current, nil
 	}
-	if invocationID == "last" && job.Last != nil {
-		return job.Last, nil
+	if invocationID == "last" && jobScheduler.Last != nil {
+		return jobScheduler.Last, nil
 	}
 
-	invocation := job.JobInvocation(invocationID)
+	invocation := jobScheduler.Job.(*Job).GetJobInvocationByID(invocationID)
 	if invocation == nil {
 		return nil, resultProvider.NotFound()
 	}

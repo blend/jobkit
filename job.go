@@ -63,18 +63,20 @@ type Job struct {
 	NotificationsQueueSlack   *RetryQueue
 	NotificationsQueueWebhook *RetryQueue
 
-	HistoryMux      sync.Mutex
-	History         []JobInvocation
+	HistoryMux    sync.Mutex
+	History       []*JobInvocation
+	HistoryLookup map[string]*JobInvocation
+
 	HistoryProvider HistoryProvider
 }
 
 // Name returns the job name.
-func (job Job) Name() string {
+func (job *Job) Name() string {
 	return job.Job.Name()
 }
 
 // Schedule returns the job schedule.
-func (job Job) Schedule() cron.Schedule {
+func (job *Job) Schedule() cron.Schedule {
 	if typed, ok := job.Job.(cron.ScheduleProvider); ok {
 		return typed.Schedule()
 	}
@@ -82,7 +84,7 @@ func (job Job) Schedule() cron.Schedule {
 }
 
 // Config implements job config provider.
-func (job Job) Config() cron.JobConfig {
+func (job *Job) Config() cron.JobConfig {
 	var cfg cron.JobConfig
 	if typed, ok := job.Job.(cron.ConfigProvider); ok {
 		cfg = typed.Config()
@@ -91,7 +93,7 @@ func (job Job) Config() cron.JobConfig {
 }
 
 // Lifecycle implements cron.LifecycleProvider.
-func (job Job) Lifecycle() (output cron.JobLifecycle) {
+func (job *Job) Lifecycle() (output cron.JobLifecycle) {
 	var innerLifecycle cron.JobLifecycle
 	if typed, ok := job.Job.(cron.LifecycleProvider); ok {
 		innerLifecycle = typed.Lifecycle()
@@ -179,8 +181,13 @@ func (job Job) Lifecycle() (output cron.JobLifecycle) {
 }
 
 // OnLoad implements job on load handler.
-func (job Job) OnLoad() error {
-	logger.MaybeDebugf(job.Log, "starting retry queue workers")
+func (job *Job) OnLoad() error {
+	logger.MaybeDebugf(job.Log, "on load: restoring history")
+	if err := job.RestoreHistory(context.Background()); err != nil {
+		return err
+	}
+
+	logger.MaybeDebugf(job.Log, "on load: starting retry queue workers")
 	job.NotificationsQueueEmail = NewRetryQueue(job.notifyEmail)
 	job.NotificationsQueueEmail.Log = job.Log
 	go job.NotificationsQueueEmail.Start()
@@ -200,7 +207,7 @@ func (job Job) OnLoad() error {
 }
 
 // OnUnload implements job on unload handler.
-func (job Job) OnUnload() error {
+func (job *Job) OnUnload() error {
 	job.NotificationsQueueEmail.Stop()
 	job.NotificationsQueueSlack.Stop()
 	job.NotificationsQueueWebhook.Stop()
@@ -279,9 +286,30 @@ func (job Job) OnDisabled(ctx context.Context) {
 	}
 }
 
+// GetJobInvocationByID returns a job invocation by id.
+func (job *Job) GetJobInvocationByID(invocationID string) *JobInvocation {
+	job.HistoryMux.Lock()
+	defer job.HistoryMux.Unlock()
+	if ji, ok := job.HistoryLookup[invocationID]; ok {
+		return ji
+	}
+	return nil
+}
+
 // Execute is the job body.
-func (job Job) Execute(ctx context.Context) error {
-	return job.Job.Execute(ctx)
+func (job *Job) Execute(ctx context.Context) (err error) {
+	invocationOutput := NewJobInvocationOutput()
+	ctx = WithJobInvocationOutput(ctx, invocationOutput)
+	if err = job.Job.Execute(ctx); err != nil {
+		return
+	}
+	job.AddHistory(NewJobInvocation(cron.GetJobInvocation(ctx), invocationOutput))
+	job.CullHistory()
+
+	if err = job.PersistHistory(ctx); err != nil {
+		return
+	}
+	return
 }
 
 //
@@ -301,7 +329,6 @@ func (job Job) Error(ctx context.Context, err error) error {
 		job.Log.WithContext(ctx).Error(err)
 	}
 	return err
-
 }
 
 //
@@ -414,16 +441,14 @@ func (job *Job) RestoreHistory(ctx context.Context) error {
 	if job.JobConfig.HistoryPersistenceDisabledOrDefault() {
 		return nil
 	}
-
-	historyProvider, ok := job.Job.(HistoryProvider)
-	if !ok {
+	if job.HistoryProvider == nil {
 		return nil
 	}
 
 	job.HistoryMux.Lock()
 	defer job.HistoryMux.Unlock()
 	var err error
-	if job.History, err = historyProvider.RestoreHistory(ctx); err != nil {
+	if job.History, err = job.HistoryProvider.RestoreHistory(ctx); err != nil {
 		return job.Error(ctx, err)
 	}
 	return nil
@@ -437,7 +462,6 @@ func (job *Job) PersistHistory(ctx context.Context) error {
 	if !job.JobConfig.HistoryPersistenceDisabledOrDefault() {
 		return nil
 	}
-
 	if job.HistoryProvider == nil {
 		return nil
 	}
@@ -445,7 +469,7 @@ func (job *Job) PersistHistory(ctx context.Context) error {
 	job.HistoryMux.Lock()
 	defer job.HistoryMux.Unlock()
 
-	historyCopy := make([]JobInvocation, len(job.History))
+	historyCopy := make([]*JobInvocation, len(job.History))
 	copy(historyCopy, job.History)
 	if err := job.HistoryProvider.PersistHistory(ctx, historyCopy); err != nil {
 		return job.Error(ctx, err)
@@ -453,17 +477,30 @@ func (job *Job) PersistHistory(ctx context.Context) error {
 	return nil
 }
 
+// AddHistory adds an item to history.
+func (job *Job) AddHistory(ji *JobInvocation) {
+	job.HistoryMux.Lock()
+	job.History = append(job.History, ji)
+	job.HistoryLookup[ji.JobInvocation.ID] = ji
+	job.HistoryMux.Unlock()
+}
+
 // CullHistory culls history after the job completes, but before we persist history.
-func (job *Job) CullHistory() []JobInvocation {
+func (job *Job) CullHistory() {
+	job.HistoryMux.Lock()
+	defer job.HistoryMux.Unlock()
+
 	count := len(job.History)
 	maxCount := job.JobConfig.HistoryMaxCountOrDefault()
 	maxAge := job.JobConfig.HistoryMaxAgeOrDefault()
 
 	now := time.Now().UTC()
-	var filtered []JobInvocation
+	var filtered []*JobInvocation
+	var removed []string
 	for index, h := range job.History {
 		if maxCount > 0 {
 			if index < (count - maxCount) {
+				removed = append(removed, h.JobInvocation.ID)
 				continue
 			}
 		}
@@ -474,7 +511,11 @@ func (job *Job) CullHistory() []JobInvocation {
 		}
 		filtered = append(filtered, h)
 	}
-	return filtered
+
+	for _, id := range removed {
+		delete(job.HistoryLookup, id)
+	}
+	job.History = filtered
 }
 
 // Stats returns job stats.
