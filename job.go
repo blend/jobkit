@@ -229,9 +229,15 @@ func (job *Job) OnLoad() error {
 
 // OnUnload implements job on unload handler.
 func (job *Job) OnUnload() error {
-	job.NotificationsQueueEmail.Stop()
-	job.NotificationsQueueSlack.Stop()
-	job.NotificationsQueueWebhook.Stop()
+	if job.NotificationsQueueEmail != nil {
+		job.NotificationsQueueEmail.Stop()
+	}
+	if job.NotificationsQueueSlack != nil {
+		job.NotificationsQueueSlack.Stop()
+	}
+	if job.NotificationsQueueWebhook != nil {
+		job.NotificationsQueueWebhook.Stop()
+	}
 	return nil
 }
 
@@ -311,6 +317,7 @@ func (job *Job) OnDisabled(ctx context.Context) {
 func (job *Job) GetJobInvocationByID(invocationID string) *JobInvocation {
 	job.HistoryMux.Lock()
 	defer job.HistoryMux.Unlock()
+
 	if ji, ok := job.HistoryLookup[invocationID]; ok {
 		return ji
 	}
