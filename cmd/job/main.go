@@ -259,14 +259,14 @@ func run(cmd *cobra.Command, args []string) error {
 		disabled := ansi.ColorRed.Apply("disabled")
 		log.Infof("loading job `%s` with exec: %s", jobCfg.Name, ansi.ColorLightWhite.Apply(strings.Join(jobCfg.Exec, " ")))
 		log.Infof("loading job `%s` with schedule: %s", jobCfg.Name, ansi.ColorLightWhite.Apply(jobCfg.ScheduleOrDefault()))
-		if jobCfg.HistoryDisabledOrDefault() && jobCfg.HistoryPersistenceDisabledOrDefault() {
+		if !jobCfg.HistoryDisabledOrDefault() && !jobCfg.HistoryPersistenceDisabledOrDefault() {
 			log.Infof("loading job `%s` with history: %v and persistence: %v to output path: %s", jobCfg.Name, enabled, enabled, ansi.ColorLightWhite.Apply(jobCfg.HistoryPathOrDefault()))
-		} else if jobCfg.HistoryDisabledOrDefault() {
+		} else if !jobCfg.HistoryDisabledOrDefault() {
 			log.Infof("loading job `%s` with history: %v and persistence: %v", jobCfg.Name, enabled, disabled)
 		} else {
 			log.Infof("loading job `%s` with history: %v", jobCfg.Name, disabled)
 		}
-		if jobCfg.HistoryDisabledOrDefault() {
+		if !jobCfg.HistoryDisabledOrDefault() {
 			if jobCfg.HistoryMaxCountOrDefault() > 0 {
 				maxCount := ansi.ColorLightWhite.Apply(fmt.Sprint(jobCfg.HistoryMaxCountOrDefault()))
 				log.Infof("loading job `%s` with history max count: %s", jobCfg.Name, maxCount)
@@ -318,6 +318,7 @@ func createJobFromConfig(base config, cfg jobkit.JobConfig) (*jobkit.Job, error)
 	)
 	job, err := jobkit.NewJob(
 		cron.NewJob(
+			cron.OptJobName(cfg.Name),
 			cron.OptJobAction(action.Execute),
 			cron.OptJobConfig(cfg.JobConfig),
 		),

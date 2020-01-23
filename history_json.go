@@ -17,7 +17,7 @@ type HistoryJSON struct {
 }
 
 // PersistHistory writes the history to disk fully, overwriting any existing file.
-func (hj HistoryJSON) PersistHistory(ctx context.Context, log []cron.JobInvocation) error {
+func (hj HistoryJSON) PersistHistory(ctx context.Context, history []*JobInvocation) error {
 	historyDirectory := hj.Config.HistoryPathOrDefault()
 	if _, err := os.Stat(historyDirectory); err != nil {
 		if err := os.MkdirAll(historyDirectory, 0755); err != nil {
@@ -34,11 +34,11 @@ func (hj HistoryJSON) PersistHistory(ctx context.Context, log []cron.JobInvocati
 		return err
 	}
 	defer f.Close()
-	return json.NewEncoder(f).Encode(log)
+	return json.NewEncoder(f).Encode(history)
 }
 
 // RestoreHistory reads history from disk and returns the log.
-func (hj HistoryJSON) RestoreHistory(ctx context.Context) (output []cron.JobInvocation, err error) {
+func (hj HistoryJSON) RestoreHistory(ctx context.Context) (output []*JobInvocation, err error) {
 	ji := cron.GetJobInvocation(ctx)
 	if ji == nil {
 		return nil, nil

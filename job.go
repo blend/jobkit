@@ -64,6 +64,8 @@ type JobOption func(*Job) error
 
 // Job is the main job body.
 type Job struct {
+	sync.Mutex
+
 	Job         cron.Job
 	JobConfig   JobConfig
 	JobSchedule cron.Schedule
@@ -86,7 +88,6 @@ type Job struct {
 	NotificationsQueueSlack   *RetryQueue
 	NotificationsQueueWebhook *RetryQueue
 
-	HistoryMux    sync.Mutex
 	History       []*JobInvocation
 	HistoryLookup map[string]*JobInvocation
 
@@ -122,25 +123,29 @@ func (job *Job) Lifecycle() (output cron.JobLifecycle) {
 		innerLifecycle = typed.Lifecycle()
 	}
 
-	output.OnLoad = func() error {
-		if err := job.OnLoad(); err != nil {
+	output.OnLoad = func(ctx context.Context) error {
+		if err := job.OnLoad(ctx); err != nil {
 			return err
 		}
 		if innerLifecycle.OnLoad != nil {
-			if err := innerLifecycle.OnLoad(); err != nil {
+			if err := innerLifecycle.OnLoad(ctx); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
-	output.OnUnload = func() error {
-		if err := job.OnUnload(); err != nil {
+	output.OnUnload = func(ctx context.Context) error {
+		job.Debugf(ctx, "OnUnload::OnUnload")
+		defer job.Debugf(ctx, "OnUnload::OnUnload Complete")
+		if err := job.OnUnload(ctx); err != nil {
 			return err
 		}
 		if innerLifecycle.OnUnload != nil {
-			if err := innerLifecycle.OnUnload(); err != nil {
+			job.Debugf(ctx, "OnUnload::Inner.OnUnload")
+			if err := innerLifecycle.OnUnload(ctx); err != nil {
 				return err
 			}
+			job.Debugf(ctx, "OnUnload::Inner.OnUnload Complete")
 		}
 		return nil
 	}
@@ -204,8 +209,8 @@ func (job *Job) Lifecycle() (output cron.JobLifecycle) {
 }
 
 // OnLoad implements job on load handler.
-func (job *Job) OnLoad() error {
-	if err := job.RestoreHistory(context.Background()); err != nil {
+func (job *Job) OnLoad(ctx context.Context) error {
+	if err := job.RestoreHistory(ctx); err != nil {
 		return err
 	}
 
@@ -228,7 +233,7 @@ func (job *Job) OnLoad() error {
 }
 
 // OnUnload implements job on unload handler.
-func (job *Job) OnUnload() error {
+func (job *Job) OnUnload(ctx context.Context) error {
 	if job.NotificationsQueueEmail != nil {
 		job.NotificationsQueueEmail.Stop()
 	}
@@ -315,8 +320,8 @@ func (job *Job) OnDisabled(ctx context.Context) {
 
 // GetJobInvocationByID returns a job invocation by id.
 func (job *Job) GetJobInvocationByID(invocationID string) *JobInvocation {
-	job.HistoryMux.Lock()
-	defer job.HistoryMux.Unlock()
+	job.Lock()
+	defer job.Unlock()
 
 	if ji, ok := job.HistoryLookup[invocationID]; ok {
 		return ji
@@ -328,9 +333,9 @@ func (job *Job) GetJobInvocationByID(invocationID string) *JobInvocation {
 func (job *Job) Execute(ctx context.Context) (err error) {
 	invocationOutput := NewJobInvocationOutput()
 
-	job.HistoryMux.Lock()
+	job.Lock()
 	job.Current = NewJobInvocation(cron.GetJobInvocation(ctx), invocationOutput)
-	job.HistoryMux.Unlock()
+	job.Unlock()
 
 	ctx = WithJobInvocationOutput(ctx, invocationOutput)
 	if err = job.Job.Execute(ctx); err != nil {
@@ -476,8 +481,9 @@ func (job *Job) RestoreHistory(ctx context.Context) error {
 		return nil
 	}
 
-	job.HistoryMux.Lock()
-	defer job.HistoryMux.Unlock()
+	job.Lock()
+	defer job.Unlock()
+
 	logger.MaybeDebugf(job.Log, "restoring history")
 	var err error
 	if job.History, err = job.HistoryProvider.RestoreHistory(ctx); err != nil {
@@ -498,8 +504,8 @@ func (job *Job) PersistHistory(ctx context.Context) error {
 		return nil
 	}
 
-	job.HistoryMux.Lock()
-	defer job.HistoryMux.Unlock()
+	job.Lock()
+	defer job.Unlock()
 	logger.MaybeDebugf(job.Log, "persisting history")
 
 	historyCopy := make([]*JobInvocation, len(job.History))
@@ -512,8 +518,8 @@ func (job *Job) PersistHistory(ctx context.Context) error {
 
 // AddHistoryResult adds an item to history and culls old items.
 func (job *Job) AddHistoryResult() {
-	job.HistoryMux.Lock()
-	defer job.HistoryMux.Unlock()
+	job.Lock()
+	defer job.Unlock()
 
 	ji := job.Current
 	job.Last = ji

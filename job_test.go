@@ -34,12 +34,12 @@ func TestNewJob(t *testing.T) {
 	inner := cron.NewJob(cron.OptJobAction(action))
 
 	job, err := NewJob(inner,
-		OptParsedSchedule("@every 2s"),
-		OptConfig(cfg),
+		OptJobParsedSchedule("@every 2s"),
+		OptJobConfig(cfg),
 	)
 	assert.Nil(err)
 	assert.NotNil(job)
-	assert.Equal(2*time.Second, job.CompiledSchedule.(cron.IntervalSchedule).Every)
+	assert.Equal(2*time.Second, job.JobSchedule.(cron.IntervalSchedule).Every)
 	assert.Nil(job.Execute(context.Background()))
 	assert.True(didCallAction)
 }
@@ -89,11 +89,11 @@ func TestJobLifecycleHooksNotificationsSetDisabled(t *testing.T) {
 
 	job := &Job{
 		SlackClient: slack.MockWebhookSender(slackMessages),
-		Config: JobConfig{
+		JobConfig: JobConfig{
 			Notifications: JobNotificationsConfig{
 				OnBegin:        ref.Bool(false),
 				OnComplete:     ref.Bool(false),
-				OnFailure:      ref.Bool(false),
+				OnError:        ref.Bool(false),
 				OnBroken:       ref.Bool(false),
 				OnFixed:        ref.Bool(false),
 				OnCancellation: ref.Bool(false),
@@ -107,7 +107,7 @@ func TestJobLifecycleHooksNotificationsSetDisabled(t *testing.T) {
 	job.OnComplete(ctx)
 	assert.Empty(slackMessages)
 
-	job.OnFailure(ctx)
+	job.OnError(ctx)
 	assert.Empty(slackMessages)
 
 	job.OnCancellation(ctx)
@@ -133,11 +133,11 @@ func TestJobLifecycleHooksNotificationsSetEnabled(t *testing.T) {
 
 	job := &Job{
 		SlackClient: slack.MockWebhookSender(slackMessages),
-		Config: JobConfig{
+		JobConfig: JobConfig{
 			Notifications: JobNotificationsConfig{
 				OnBegin:        ref.Bool(true),
-				OnComplete:     ref.Bool(true),
-				OnFailure:      ref.Bool(true),
+				OnSuccess:      ref.Bool(true),
+				OnError:        ref.Bool(true),
 				OnBroken:       ref.Bool(true),
 				OnFixed:        ref.Bool(true),
 				OnCancellation: ref.Bool(true),
@@ -145,8 +145,8 @@ func TestJobLifecycleHooksNotificationsSetEnabled(t *testing.T) {
 		},
 	}
 	job.OnBegin(ctx)
-	job.OnComplete(ctx)
-	job.OnFailure(ctx)
+	job.OnSuccess(ctx)
+	job.OnError(ctx)
 	job.OnCancellation(ctx)
 	job.OnBroken(ctx)
 	job.OnFixed(ctx)
@@ -157,7 +157,7 @@ func TestJobLifecycleHooksNotificationsSetEnabled(t *testing.T) {
 	assert.Contains(msg.Attachments[0].Text, "cron.begin")
 
 	msg = <-slackMessages
-	assert.Contains(msg.Attachments[0].Text, "cron.complete")
+	assert.Contains(msg.Attachments[0].Text, "cron.success")
 
 	msg = <-slackMessages
 	assert.Contains(msg.Attachments[0].Text, "cron.failed")
@@ -245,11 +245,11 @@ func TestJobLifecycleHooksWebhookNotifications(t *testing.T) {
 		WebhookDefaults: Webhook{
 			URL: hookServer.URL,
 		},
-		Config: JobConfig{
+		JobConfig: JobConfig{
 			Notifications: JobNotificationsConfig{
 				OnBegin:        ref.Bool(true),
-				OnComplete:     ref.Bool(true),
-				OnFailure:      ref.Bool(true),
+				OnSuccess:      ref.Bool(true),
+				OnError:        ref.Bool(true),
 				OnBroken:       ref.Bool(true),
 				OnFixed:        ref.Bool(true),
 				OnCancellation: ref.Bool(true),
@@ -258,8 +258,8 @@ func TestJobLifecycleHooksWebhookNotifications(t *testing.T) {
 	}
 
 	job.OnBegin(ctx)
-	job.OnComplete(ctx)
-	job.OnFailure(ctx)
+	job.OnSuccess(ctx)
+	job.OnError(ctx)
 	job.OnCancellation(ctx)
 	job.OnBroken(ctx)
 	job.OnFixed(ctx)
@@ -275,26 +275,25 @@ func TestJobHistoryProvider(t *testing.T) {
 	defer os.RemoveAll(tmpdir)
 
 	cfg := JobConfig{
-		JobConfig: cron.JobConfig{
-			Name: "gosdk_jobkit",
-		},
+		Name:        "gosdk_jobkit",
+		JobConfig:   cron.JobConfig{},
 		HistoryPath: tmpdir,
 	}
 	job := &Job{
-		Config:          cfg,
+		JobConfig:       cfg,
 		HistoryProvider: HistoryJSON{Config: cfg},
 	}
 
-	history := []cron.JobInvocation{
+	job.History = []*JobInvocation{
 		createTestCompleteJobInvocation("test0", 100*time.Millisecond),
 		createTestCompleteJobInvocation("test0", 200*time.Millisecond),
 		createTestFailedJobInvocation("test0", 100*time.Millisecond, fmt.Errorf("this is only a test")),
 	}
 
-	err = job.PersistHistory(context.Background(), history)
+	err = job.PersistHistory(context.Background())
 	assert.Nil(err)
 
-	returned, err := job.RestoreHistory(context.Background())
+	err = job.RestoreHistory(context.Background())
 	assert.Nil(err)
-	assert.Len(returned, 3)
+	assert.Len(job.History, 3)
 }

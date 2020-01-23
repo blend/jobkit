@@ -42,9 +42,9 @@ func createTestBufferChunk(index int) bufferutil.BufferChunk {
 	}
 }
 
-func createTestCompleteJobInvocation(jobName string, elapsed time.Duration) JobInvocation {
+func createTestCompleteJobInvocation(jobName string, elapsed time.Duration) *JobInvocation {
 	ts := time.Now().UTC()
-	return JobInvocation{
+	return &JobInvocation{
 		JobInvocation: cron.JobInvocation{
 			ID:       uuid.V4().String(),
 			JobName:  jobName,
@@ -52,21 +52,23 @@ func createTestCompleteJobInvocation(jobName string, elapsed time.Duration) JobI
 			Complete: ts.Add(elapsed),
 			Status:   cron.JobInvocationStatusSuccess,
 		},
-		Output: &bufferutil.Buffer{
-			Chunks: []bufferutil.BufferChunk{
-				createTestBufferChunk(0),
-				createTestBufferChunk(1),
-				createTestBufferChunk(2),
-				createTestBufferChunk(3),
-				createTestBufferChunk(4),
+		JobInvocationOutput: JobInvocationOutput{
+			Output: &bufferutil.Buffer{
+				Chunks: []bufferutil.BufferChunk{
+					createTestBufferChunk(0),
+					createTestBufferChunk(1),
+					createTestBufferChunk(2),
+					createTestBufferChunk(3),
+					createTestBufferChunk(4),
+				},
 			},
 		},
 	}
 }
 
-func createTestFailedJobInvocation(jobName string, elapsed time.Duration, err error) JobInvocation {
+func createTestFailedJobInvocation(jobName string, elapsed time.Duration, err error) *JobInvocation {
 	ts := time.Now().UTC()
-	return JobInvocation{
+	return &JobInvocation{
 		JobInvocation: cron.JobInvocation{
 			ID:       uuid.V4().String(),
 			JobName:  jobName,
@@ -105,26 +107,30 @@ func createTestJobManager() *cron.JobManager {
 	test0CurrentBufferHandlers := new(bufferutil.BufferHandlers)
 	test0CurrentOutput.Handler = test0CurrentBufferHandlers.Handle
 
-	jm.Jobs["test0"].Current = &cron.JobInvocation{
-		ID:             uuid.V4().String(),
-		JobName:        "test0",
-		Started:        time.Now().UTC(),
-		Output:         test0CurrentOutput,
-		OutputHandlers: test0CurrentBufferHandlers,
+	jm.Jobs["test0"].Job.(*Job).Current = &JobInvocation{
+		JobInvocation: cron.JobInvocation{
+			ID:      uuid.V4().String(),
+			JobName: "test0",
+			Started: time.Now().UTC(),
+		},
+		JobInvocationOutput: JobInvocationOutput{
+			Output:         test0CurrentOutput,
+			OutputHandlers: test0CurrentBufferHandlers,
+		},
 	}
 
-	jm.Jobs["test0"].History = []cron.JobInvocation{
+	jm.Jobs["test0"].Job.(*Job).History = []*JobInvocation{
 		createTestCompleteJobInvocation("test0", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test0", 250*time.Millisecond),
 		createTestFailedJobInvocation("test0", 5*time.Second, fmt.Errorf("this is only a test %s", uuid.V4().String())),
 	}
-	jm.Jobs["test1"].History = []cron.JobInvocation{
+	jm.Jobs["test1"].Job.(*Job).History = []*JobInvocation{
 		createTestCompleteJobInvocation("test1", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test1", 250*time.Millisecond),
 		createTestCompleteJobInvocation("test1", 300*time.Millisecond),
 		createTestCompleteJobInvocation("test1", 350*time.Millisecond),
 	}
-	jm.Jobs["test2 job.foo"].History = []cron.JobInvocation{
+	jm.Jobs["test2 job.foo"].Job.(*Job).History = []*JobInvocation{
 		createTestCompleteJobInvocation("test2 job.foo", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test2 job.foo", 250*time.Millisecond),
 		createTestCompleteJobInvocation("test2 job.foo", 300*time.Millisecond),

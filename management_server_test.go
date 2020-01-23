@@ -160,10 +160,10 @@ func TestManagementServerJob(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	job := firstJob(jm)
-	assert.NotNil(job)
-	jobName := job.Name()
-	invocationID := job.History[0].ID
+	jobScheduler := firstJob(jm)
+	assert.NotNil(jobScheduler)
+	jobName := jobScheduler.Name()
+	invocationID := jobScheduler.Job.(*Job).History[0].JobInvocation.ID
 
 	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job/%s", jobName)).Bytes()
 	assert.Nil(err)
@@ -275,7 +275,7 @@ func TestManagementServerJobInvocation(t *testing.T) {
 	assert.NotNil(job)
 
 	jobName := job.Name()
-	invocationID := job.History[0].ID
+	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
 
 	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job.invocation/%s/%s", jobName, invocationID)).Bytes()
 	assert.Nil(err)
@@ -491,7 +491,7 @@ func TestManagementServerAPIJobInvocation(t *testing.T) {
 	assert.NotNil(job)
 
 	jobName := job.Name()
-	invocationID := job.History[0].ID
+	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
 
 	var ji cron.JobInvocation
 	meta, err := web.MockGet(app, fmt.Sprintf("/api/job.invocation/%s/%s", jobName, invocationID)).JSON(&ji)
@@ -510,7 +510,7 @@ func TestManagementServerAPIJobInvocationOutput(t *testing.T) {
 	assert.NotNil(job)
 
 	jobName := job.Name()
-	invocationID := job.History[0].ID
+	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
 
 	var output struct {
 		ServerTimeNanos int64                    `json:"serverTimeNanos"`
@@ -532,8 +532,9 @@ func TestManagementServerAPIJobInvocationOutputAfterNanos(t *testing.T) {
 	assert.NotNil(job)
 
 	jobName := job.Name()
-	invocationID := job.History[0].ID
-	afterNanos := job.History[0].Output.Chunks[2].Timestamp.UnixNano()
+	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
+
+	afterNanos := job.Job.(*Job).History[0].JobInvocationOutput.Output.Chunks[2].Timestamp.UnixNano()
 
 	var output struct {
 		ServerTimeNanos int64                    `json:"serverTimeNanos"`
@@ -559,7 +560,7 @@ func TestManagementServerAPIJobInvocationOutputAfterNanosInvalid(t *testing.T) {
 	assert.NotNil(job)
 
 	jobName := job.Name()
-	invocationID := job.History[0].ID
+	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
 
 	var output struct {
 		ServerTimeNanos int64                    `json:"serverTimeNanos"`
@@ -586,7 +587,7 @@ func TestManagementServerAPIJobInvocationOutputStreamComplete(t *testing.T) {
 	assert.NotNil(job)
 
 	jobName := job.Name()
-	invocationID := job.History[0].ID
+	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
 
 	res, err := web.MockGet(app,
 		fmt.Sprintf("/api/job.invocation.output.stream/%s/%s", jobName, invocationID),
@@ -612,8 +613,8 @@ func TestManagementServerAPIJobInvocationOutputStream(t *testing.T) {
 	assert.NotNil(job)
 
 	jobName := job.Name()
-	ji := job.Current
-	invocationID := ji.ID
+	ji := job.Job.(*Job).Current
+	invocationID := ji.JobInvocation.ID
 
 	res, err := web.MockGet(app,
 		fmt.Sprintf("/api/job.invocation.output.stream/%s/%s", jobName, invocationID),
@@ -624,20 +625,20 @@ func TestManagementServerAPIJobInvocationOutputStream(t *testing.T) {
 	finish := make(chan struct{})
 	go func() {
 		<-start
-		io.WriteString(ji.Output, "test1\n")
-		io.WriteString(ji.Output, "test2\n")
-		io.WriteString(ji.Output, "test3\n")
-		io.WriteString(ji.Output, "test4\n")
-		io.WriteString(ji.Output, "test5\n")
+		io.WriteString(ji.JobInvocationOutput.Output, "test1\n")
+		io.WriteString(ji.JobInvocationOutput.Output, "test2\n")
+		io.WriteString(ji.JobInvocationOutput.Output, "test3\n")
+		io.WriteString(ji.JobInvocationOutput.Output, "test4\n")
+		io.WriteString(ji.JobInvocationOutput.Output, "test5\n")
 
 		<-finish
-		ji.State = cron.JobInvocationStateComplete
-		ji.Finished = time.Now().UTC()
+		ji.JobInvocation.Status = cron.JobInvocationStatusSuccess
+		ji.JobInvocation.Complete = time.Now().UTC()
 
-		job.Lock()
-		job.Last = ji
-		job.Current = nil
-		job.Unlock()
+		job.Job.(*Job).Lock()
+		job.Job.(*Job).Last = ji
+		job.Job.(*Job).Current = nil
+		job.Job.(*Job).Unlock()
 	}()
 
 	assert.Nil(err)

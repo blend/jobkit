@@ -7,9 +7,8 @@ import "github.com/blend/go-sdk/cron"
 // from configuration.
 // You can use this job config by embedding it into your larger job config struct.
 type JobConfig struct {
-	cron.JobConfig    `yaml:",inline"`
-	ShellActionConfig `yaml:",inline"`
-
+	cron.JobConfig             `yaml:",inline"`
+	ShellActionConfig          `yaml:",inline"`
 	Name                       string                 `yaml:"name"`
 	Schedule                   string                 `yaml:"schedule"`
 	HistoryPath                string                 `yaml:"historyPath"`
