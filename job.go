@@ -136,7 +136,8 @@ func (job *Job) Lifecycle() (output cron.JobLifecycle) {
 	}
 	output.OnUnload = func(ctx context.Context) error {
 		job.Debugf(ctx, "OnUnload::OnUnload")
-		defer job.Debugf(ctx, "OnUnload::OnUnload Complete")
+		defer func() { job.Debugf(ctx, "OnUnload::OnUnload Complete") }()
+
 		if err := job.OnUnload(ctx); err != nil {
 			return err
 		}
