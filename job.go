@@ -30,6 +30,9 @@ func NewJob(wrapped cron.Job, options ...JobOption) (*Job, error) {
 	job := &Job{
 		Job: wrapped,
 	}
+	if typed, ok := job.Job.(cron.ScheduleProvider); ok {
+		job.JobSchedule = typed.Schedule()
+	}
 	var err error
 	for _, opt := range options {
 		if err = opt(job); err != nil {
@@ -101,9 +104,6 @@ func (job *Job) Name() string {
 
 // Schedule returns the job schedule.
 func (job *Job) Schedule() cron.Schedule {
-	if typed, ok := job.Job.(cron.ScheduleProvider); ok {
-		return typed.Schedule()
-	}
 	return job.JobSchedule
 }
 
@@ -135,18 +135,13 @@ func (job *Job) Lifecycle() (output cron.JobLifecycle) {
 		return nil
 	}
 	output.OnUnload = func(ctx context.Context) error {
-		job.Debugf(ctx, "OnUnload::OnUnload")
-		defer func() { job.Debugf(ctx, "OnUnload::OnUnload Complete") }()
-
 		if err := job.OnUnload(ctx); err != nil {
 			return err
 		}
 		if innerLifecycle.OnUnload != nil {
-			job.Debugf(ctx, "OnUnload::Inner.OnUnload")
 			if err := innerLifecycle.OnUnload(ctx); err != nil {
 				return err
 			}
-			job.Debugf(ctx, "OnUnload::Inner.OnUnload Complete")
 		}
 		return nil
 	}

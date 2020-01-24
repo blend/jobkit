@@ -177,6 +177,26 @@ func fatalExit(action func(*cobra.Command, []string) error) func(*cobra.Command,
 	}
 }
 
+type configUpdater struct {
+	Log    logger.Log
+	Config *config
+}
+
+func (cu *configUpdater) Start() error {
+	return nil
+}
+
+func (cu *configUpdater) Stop() error {
+	return nil
+}
+
+func (cu *configUpdater) Update() error {
+	if _, err := configutil.Read(cu.Config, configutil.OptPaths(*flagConfigPath)); !configutil.IsIgnored(err) {
+		return err
+	}
+	return nil
+}
+
 func run(cmd *cobra.Command, args []string) error {
 	var cfg config
 	if _, err := configutil.Read(&cfg, configutil.OptPaths(*flagConfigPath)); !configutil.IsIgnored(err) {
@@ -286,7 +306,6 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	hosted := []graceful.Graceful{jobs}
-
 	if !*flagDisableServer {
 		ws := jobkit.NewServer(jobs, cfg.Config)
 		if cfg.Config.UseViewFilesOrDefault() {
@@ -323,6 +342,7 @@ func createJobFromConfig(base config, cfg jobkit.JobConfig) (*jobkit.Job, error)
 			cron.OptJobConfig(cfg.JobConfig),
 		),
 		jobkit.OptJobConfig(cfg),
+		jobkit.OptJobParsedSchedule(cfg.Schedule),
 	)
 	if err != nil {
 		return nil, err
