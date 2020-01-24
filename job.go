@@ -25,10 +25,21 @@ var (
 	_ cron.LifecycleProvider = (*Job)(nil)
 )
 
+// MustNewJob returns a new job with a given set of options and panics if ther
+// is an error.
+func MustNewJob(wrapped cron.Job, options ...JobOption) *Job {
+	job, err := NewJob(wrapped, options...)
+	if err != nil {
+		panic(err)
+	}
+	return job
+}
+
 // NewJob returns a new job.
 func NewJob(wrapped cron.Job, options ...JobOption) (*Job, error) {
 	job := &Job{
-		Job: wrapped,
+		Job:           wrapped,
+		HistoryLookup: make(map[string]*JobInvocation),
 	}
 	if typed, ok := job.Job.(cron.ScheduleProvider); ok {
 		job.JobSchedule = typed.Schedule()

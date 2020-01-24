@@ -2,18 +2,18 @@
 <tr id="{{ .ViewModel.Name }}">
 	<td> <!-- status -->
 
-		{{ if .ViewModel.HistoryEnabled | not  }}
+		{{ if .ViewModel.JobConfig.HistoryDisabled | not  }}
 
 		<!-- if history is disabled -->
 		{{ if .ViewModel.Current }}
 		<div uk-tooltip="Job is currently running" uk-spinner="ration: 0.5"></div>
 		{{ else if .ViewModel.Last }}
 
-		{{ if .ViewModel.Last.State | eq "cancelled" }}
+		{{ if .ViewModel.Last.JobInvocation.Status | eq "cancelled" }}
 		<span class="uk-text-warning" uk-icon="warning" uk-tooltip="Last invocation cancelled"></span>
-		{{ else if .ViewModel.Last.State | eq "failed" }}
+		{{ else if .ViewModel.Last.JobInvocation.Status | eq "errored" }}
 		<span class="uk-text-danger" uk-icon="warning" uk-tooltip="Last invocation failed"></span>
-		{{ else if .ViewModel.Last.State | eq "complete" }}
+		{{ else if .ViewModel.Last.JobInvocation.Status | eq "complete" }}
 		<span class="uk-text-success" uk-icon="check" uk-tooltip="Last invocation completed successfully"></span>
 		{{ else }}
 		<span class="uk-text-primary" uk-icon="question" uk-tooltip="Last invocation state is unknown"></span>
@@ -60,14 +60,14 @@
 	{{ end }}
 	</td>
 	<td> <!-- schedule -->
-	{{ if .ViewModel.Timeout }}
-		{{ .ViewModel.Timeout | duration_round_millis }}
+	{{ if .ViewModel.JobConfig.Timeout }}
+		{{ .ViewModel.JobConfig.Timeout | duration_round_millis }}
 	{{ else }}
 		<span>-</span>
 	{{ end }}
 	</td>
 	<td> <!-- next run-->
-	{{ if .ViewModel.Disabled }}
+	{{ if .ViewModel.Config.Disabled }}
 		<span>-</span>
 	{{ else }}
 		{{ .ViewModel.NextRuntime | rfc3339 }}

@@ -94,7 +94,11 @@ func createTestJobManager() *cron.JobManager {
 	test2 := cron.NewJob(cron.OptJobName("test2 job.foo"))
 
 	jm := cron.New()
-	jm.LoadJobs(test0, test1, test2)
+	jm.LoadJobs(
+		MustNewJob(test0),
+		MustNewJob(test1),
+		MustNewJob(test2),
+	)
 
 	test0CurrentOutput := &bufferutil.Buffer{
 		Chunks: []bufferutil.BufferChunk{

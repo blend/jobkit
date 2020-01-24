@@ -28,7 +28,7 @@ func TestManagmentServerGetRequestJob(t *testing.T) {
 	}
 
 	r := web.MockCtx("GET", "/job/test2+job.foo", web.OptCtxRouteParamValue("jobName", "test2+job.foo"))
-	job, res := ms.getRequestJobScheduler(r, web.Text)
+	job, res := ms.getRequestJob(r, web.Text)
 	assert.Nil(res)
 	assert.NotNil(job)
 	assert.Equal("test2 job.foo", job.Name())

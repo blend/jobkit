@@ -12,13 +12,14 @@ import (
 
 // NewJobInvocation creates a new jobkit job invocation from a cron job invocation.
 func NewJobInvocation(ji *cron.JobInvocation, jio *JobInvocationOutput) *JobInvocation {
-	outputHandlers := new(bufferutil.BufferHandlers)
-	output := new(bufferutil.Buffer)
-	output.Handler = outputHandlers.Handle
-	return &JobInvocation{
-		JobInvocation:       *ji,
-		JobInvocationOutput: *jio,
+	var invocation JobInvocation
+	if ji != nil {
+		invocation.JobInvocation = *ji
 	}
+	if jio != nil {
+		invocation.JobInvocationOutput = *jio
+	}
+	return &invocation
 }
 
 var (

@@ -160,7 +160,7 @@ func TestJobLifecycleHooksNotificationsSetEnabled(t *testing.T) {
 	assert.Contains(msg.Attachments[0].Text, "cron.success")
 
 	msg = <-slackMessages
-	assert.Contains(msg.Attachments[0].Text, "cron.failed")
+	assert.Contains(msg.Attachments[0].Text, "cron.errored")
 
 	msg = <-slackMessages
 	assert.Contains(msg.Attachments[0].Text, "cron.cancelled")
@@ -213,7 +213,7 @@ func TestJobLifecycleHooksEmailNotifications(t *testing.T) {
 	assert.Contains(msg.Subject, "cron.complete")
 
 	msg = <-emailMessages
-	assert.Contains(msg.Subject, "cron.failed")
+	assert.Contains(msg.Subject, "cron.errored")
 
 	msg = <-emailMessages
 	assert.Contains(msg.Subject, "cron.cancelled")
