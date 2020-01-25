@@ -69,27 +69,6 @@ func TestManagementServerStatic(t *testing.T) {
 	assert.Equal(http.StatusOK, meta.StatusCode)
 }
 
-func TestManagementServerStatus(t *testing.T) {
-	assert := assert.New(t)
-
-	jm, app := createTestManagementServer()
-	jm.StartAsync()
-	defer jm.Stop()
-
-	var status cron.JobManagerStatus
-	meta, err := web.MockGet(app, "/status.json").JSON(&status)
-	assert.Nil(err)
-	assert.Equal(http.StatusOK, meta.StatusCode)
-	assert.Equal(cron.JobManagerStateRunning, status.State)
-
-	jm.Stop()
-
-	meta, err = web.MockGet(app, "/status.json").JSON(&status)
-	assert.Nil(err)
-	assert.Equal(http.StatusOK, meta.StatusCode)
-	assert.Equal(cron.JobManagerStateStopped, status.State)
-}
-
 func TestManagementServerIndex(t *testing.T) {
 	assert := assert.New(t)
 
@@ -324,17 +303,6 @@ func TestManagementServerJobInvocationNotFound(t *testing.T) {
 // api tests
 //
 
-func TestManagementServerAPIJobs(t *testing.T) {
-	assert := assert.New(t)
-
-	_, app := createTestManagementServer()
-	var jobs []cron.JobSchedulerStatus
-	meta, err := web.MockGet(app, "/api/jobs").JSON(&jobs)
-	assert.Nil(err)
-	assert.Equal(http.StatusOK, meta.StatusCode)
-	assert.NotEmpty(jobs)
-}
-
 func TestManagementServerAPIJobsRunning(t *testing.T) {
 	assert := assert.New(t)
 
@@ -383,11 +351,11 @@ func TestManagementServerAPIJob(t *testing.T) {
 	assert.NotNil(job)
 	jobName := job.Name()
 
-	var js cron.JobSchedulerStatus
+	var job JobViewModel
 	meta, err := web.MockGet(app, fmt.Sprintf("/api/job/%s", jobName)).JSON(&js)
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode)
-	assert.Equal(jobName, js.Name)
+	assert.Equal(jobName, job.Name)
 }
 
 func TestManagementServerAPIJobNotFound(t *testing.T) {
