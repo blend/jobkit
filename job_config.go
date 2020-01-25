@@ -1,7 +1,10 @@
 package jobkit
 
-import "time"
-import "github.com/blend/go-sdk/cron"
+import (
+	"time"
+
+	"github.com/blend/go-sdk/cron"
+)
 
 // JobConfig is something you can use to give your jobs some knobs to turn
 // from configuration.

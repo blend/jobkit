@@ -5,7 +5,7 @@
 		<div>
 			<ul class="uk-breadcrumb">
 				<li><a href="/">Jobs</a></li>
-				<li><a href="/job/{{ .ViewModel.JobInvocation.JobName | urlencode }}">{{ .ViewModel.JobInvocation.JobName }}</a></li>
+				<li><a href="/job/{{ .ViewModel.JobName | urlencode }}">{{ .ViewModel.JobName }}</a></li>
 				<li><span>{{ .ViewModel.ID }}</span></li>
 			</ul>
 		</div>
@@ -17,13 +17,13 @@
 		<div class="uk-first-child">
 			<div class="uk-text-small"><span class="uk-icon uk-text-primary uk-margin-small-right" uk-icon="info"></span>State</div>
 			<h1>
-			{{ if .ViewModel.JobInvocation.Status | eq "running" }}
+			{{ if .ViewModel.Status | eq "running" }}
 			<div uk-tooltip="Job is currently running" uk-spinner="ratio: 1.0" uk-tooltip="Invocation is running"></div>
-			{{ else if .ViewModel.JobInvocation.Status  | eq "cancelled" }}
+			{{ else if .ViewModel.Status  | eq "cancelled" }}
 			<span class="uk-text-warning" uk-icon="icon:warning; ratio:2" uk-tooltip="Invocation was cancelled"></span>
-			{{ else if.ViewModel.JobInvocation.Status  | eq "errored" }}
+			{{ else if.ViewModel.Status  | eq "errored" }}
 			<span class="uk-text-danger" uk-icon="icon:warning; ratio:2" uk-tooltip="Invocation failed"></span>
-			{{ else if .ViewModel.JobInvocation.Status  | eq "complete" }}
+			{{ else if .ViewModel.Status  | eq "complete" }}
 			<span class="uk-text-success" uk-icon="icon:check; ratio:2" uk-tooltip="Invocation complete"></span>
 			{{ else }}
 			<span class="uk-text-primary" uk-icon="icon:question; ratio:2" uk-tooltip="Invocation status unknown"></span>
@@ -41,17 +41,17 @@
 		<div>
 			<div class="uk-text-small"><span class="uk-icon uk-text-primary uk-margin-small-right" uk-icon="clock"></span>Elapsed</div>
 			<h1 id="elapsed" class="uk-text-primary">
-			{{ if .ViewModel.JobInvocation.Finished.IsZero }}{{ .ViewModel.JobInvocation.Started | since_utc }}{{ else }}{{ .ViewModel.JobInvocation.Elapsed }}{{ end }}</div>
+			{{ if .ViewModel.Complete.IsZero }}{{ .ViewModel.Started | since_utc }}{{ else }}{{ .ViewModel.JobInvocation.Elapsed }}{{ end }}</div>
 			</h1>
 		</div>
 		<hr/>
-		{{ if .ViewModel.JobInvocation.Parameters }}
+		{{ if .ViewModel.Parameters }}
 		<div class="uk-grid uk-grid-match uk-grid-divider uk-grid-medium uk-child-width-1-1">
 			<div>
 				<span class="uk-text-small">
 					Parameters
 				</span>
-				<pre>{{ .ViewModel.JobInvocation.Parameters | format_environ }}</pre>
+				<pre>{{ .ViewModel.Parameters | format_environ }}</pre>
 			</div>
 		</div>
 		<hr/>

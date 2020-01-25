@@ -111,13 +111,11 @@ func createTestJobManager() *cron.JobManager {
 	test0CurrentBufferHandlers := new(bufferutil.BufferHandlers)
 	test0CurrentOutput.Handler = test0CurrentBufferHandlers.Handle
 
-	jm.Jobs["test0"].Job.(*Job).Current = &JobInvocation{
-		JobInvocation: cron.JobInvocation{
-			ID:      uuid.V4().String(),
-			JobName: "test0",
-			Started: time.Now().UTC(),
-		},
-		JobInvocationOutput: JobInvocationOutput{
+	jm.Jobs["test0"].Current = &cron.JobInvocation{
+		ID:      uuid.V4().String(),
+		JobName: "test0",
+		Started: time.Now().UTC(),
+		State: JobInvocationOutput{
 			Output:         test0CurrentOutput,
 			OutputHandlers: test0CurrentBufferHandlers,
 		},

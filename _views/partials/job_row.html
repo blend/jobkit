@@ -2,18 +2,18 @@
 <tr id="{{ .ViewModel.Name }}">
 	<td> <!-- status -->
 
-		{{ if .ViewModel.JobConfig.HistoryDisabled | not  }}
+		{{ if .ViewModel.Config.HistoryDisabled }}
 
 		<!-- if history is disabled -->
 		{{ if .ViewModel.Current }}
 		<div uk-tooltip="Job is currently running" uk-spinner="ration: 0.5"></div>
 		{{ else if .ViewModel.Last }}
 
-		{{ if .ViewModel.Last.JobInvocation.Status | eq "cancelled" }}
+		{{ if .ViewModel.Last.Status | eq "cancelled" }}
 		<span class="uk-text-warning" uk-icon="warning" uk-tooltip="Last invocation cancelled"></span>
-		{{ else if .ViewModel.Last.JobInvocation.Status | eq "errored" }}
+		{{ else if .ViewModel.Last.Status | eq "errored" }}
 		<span class="uk-text-danger" uk-icon="warning" uk-tooltip="Last invocation failed"></span>
-		{{ else if .ViewModel.Last.JobInvocation.Status | eq "complete" }}
+		{{ else if .ViewModel.Last.Status | eq "complete" }}
 		<span class="uk-text-success" uk-icon="check" uk-tooltip="Last invocation completed successfully"></span>
 		{{ else }}
 		<span class="uk-text-primary" uk-icon="question" uk-tooltip="Last invocation state is unknown"></span>
@@ -60,8 +60,8 @@
 	{{ end }}
 	</td>
 	<td> <!-- schedule -->
-	{{ if .ViewModel.JobConfig.Timeout }}
-		{{ .ViewModel.JobConfig.Timeout | duration_round_millis }}
+	{{ if .ViewModel.Config.Timeout }}
+		{{ .ViewModel.Config.Timeout | duration_round_millis }}
 	{{ else }}
 		<span>-</span>
 	{{ end }}
@@ -75,7 +75,7 @@
 	</td>
 	<td> <!-- last run -->
 	{{ if .ViewModel.Last }}
-		{{ .ViewModel.Last.Finished | since_utc | duration_round_seconds }} ago
+		{{ .ViewModel.Last.Complete | since_utc | duration_round_seconds }} ago
 	{{ else }}
 		<span class="none">-</span>
 	{{ end }}
@@ -94,7 +94,7 @@
 		{{ end }}
 	</td>
 	<td> <!-- actions -->
-	{{ if .ViewModel.Disabled }}
+	{{ if .ViewModel.Config.Disabled }}
 		<a class="uk-button uk-button-default" href="/job.enable/{{ .ViewModel.Name | urlencode }}" uk-icon="future" uk-tooltip="Enable the job"></a>
 	{{else}}
 		<a class="uk-button uk-button-secondary" href="/job.disable/{{ .ViewModel.Name | urlencode }}" uk-icon="ban" uk-tooltip="Disable the job"></a>

@@ -87,9 +87,6 @@ type Job struct {
 	Log         logger.Log
 	StatsClient stats.Collector
 
-	Current *JobInvocation
-	Last    *JobInvocation
-
 	SlackDefaults   slack.Message
 	EmailDefaults   email.Message
 	WebhookDefaults Webhook
@@ -271,6 +268,10 @@ func (job *Job) OnSuccess(ctx context.Context) {
 
 // OnComplete is a lifecycle event handler.
 func (job *Job) OnComplete(ctx context.Context) {
+	// SPECIAL ON COMPLETE STEPS!
+	job.AddHistoryResult(NewJobInvocation(cron.GetJobInvocation(ctx)))
+	job.PersistHistory(ctx)
+
 	job.sendStats(ctx, cron.FlagComplete)
 	if job.JobConfig.Notifications.OnCompleteOrDefault() {
 		job.notify(ctx, cron.FlagComplete)
@@ -340,16 +341,11 @@ func (job *Job) GetJobInvocationByID(invocationID string) *JobInvocation {
 func (job *Job) Execute(ctx context.Context) (err error) {
 	invocationOutput := NewJobInvocationOutput()
 
-	job.Lock()
-	job.Current = NewJobInvocation(cron.GetJobInvocation(ctx), invocationOutput)
-	job.Unlock()
-
 	ctx = WithJobInvocationOutput(ctx, invocationOutput)
+	ji := cron.GetJobInvocation(ctx)
+	ji.State = invocationOutput
+
 	if err = job.Job.Execute(ctx); err != nil {
-		return
-	}
-	job.AddHistoryResult()
-	if err = job.PersistHistory(ctx); err != nil {
 		return
 	}
 	return
@@ -423,13 +419,11 @@ func (job *Job) notifyWebhook(ctx context.Context, _ interface{}) error {
 }
 
 func (job *Job) notify(ctx context.Context, flag string) {
-	ji := cron.GetJobInvocation(ctx)
-	jio := GetJobInvocationOutput(ctx)
-	invocation := NewJobInvocation(ji, jio)
+	ji := NewJobInvocation(cron.GetJobInvocation(ctx))
 
 	if job.SlackClient != nil {
 		if ji != nil {
-			message := NewSlackMessage(flag, job.SlackDefaults, invocation)
+			message := NewSlackMessage(flag, job.SlackDefaults, ji)
 			if job.NotificationsQueueSlack != nil && job.NotificationsQueueSlack.Latch.IsStarted() {
 				job.Debugf(ctx, "notify (slack); queueing slack notification")
 				job.NotificationsQueueSlack.Add(ctx, message)
@@ -444,7 +438,7 @@ func (job *Job) notify(ctx context.Context, flag string) {
 
 	if job.EmailClient != nil {
 		if ji != nil {
-			message, err := NewEmailMessage(flag, job.EmailDefaults, invocation)
+			message, err := NewEmailMessage(flag, job.EmailDefaults, ji)
 			if err != nil {
 				job.Error(ctx, err)
 			}
@@ -524,16 +518,16 @@ func (job *Job) PersistHistory(ctx context.Context) error {
 }
 
 // AddHistoryResult adds an item to history and culls old items.
-func (job *Job) AddHistoryResult() {
+func (job *Job) AddHistoryResult(ji *JobInvocation) {
 	job.Lock()
 	defer job.Unlock()
 
-	ji := job.Current
-	job.Last = ji
-	job.Current = nil
+	if ji == nil {
+		panic("AddHistoryResult; passed a nil job invocation; what was missing?")
+	}
 
 	job.History = append(job.History, ji)
-	job.HistoryLookup[ji.JobInvocation.ID] = ji
+	job.HistoryLookup[ji.ID] = ji
 
 	count := len(job.History)
 	maxCount := job.JobConfig.HistoryMaxCountOrDefault()
@@ -573,7 +567,7 @@ func (job *Job) Stats() JobStats {
 
 	var elapsedTimes []time.Duration
 	for _, ji := range job.History {
-		switch ji.JobInvocation.Status {
+		switch ji.Status {
 		case cron.JobInvocationStatusSuccess:
 			output.RunsSuccessful++
 		case cron.JobInvocationStatusErrored:

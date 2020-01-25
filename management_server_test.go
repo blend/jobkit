@@ -31,7 +31,7 @@ func TestManagmentServerGetRequestJob(t *testing.T) {
 	job, res := ms.getRequestJob(r, web.Text)
 	assert.Nil(res)
 	assert.NotNil(job)
-	assert.Equal("test2 job.foo", job.Name())
+	assert.Equal("test2 job.foo", job.Name)
 }
 
 func TestManagmentServerGetRequestJobInvocation(t *testing.T) {
@@ -608,13 +608,13 @@ func TestManagementServerAPIJobInvocationOutputStream(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	job, err := jm.Job("test0")
+	jobScheduler, err := jm.Job("test0")
 	assert.Nil(err)
-	assert.NotNil(job)
+	assert.NotNil(jobScheduler)
 
-	jobName := job.Name()
-	ji := job.Job.(*Job).Current
-	invocationID := ji.JobInvocation.ID
+	jobName := jobScheduler.Name()
+	ji := jobScheduler.Current
+	invocationID := ji.ID
 
 	res, err := web.MockGet(app,
 		fmt.Sprintf("/api/job.invocation.output.stream/%s/%s", jobName, invocationID),
@@ -625,20 +625,20 @@ func TestManagementServerAPIJobInvocationOutputStream(t *testing.T) {
 	finish := make(chan struct{})
 	go func() {
 		<-start
-		io.WriteString(ji.JobInvocationOutput.Output, "test1\n")
-		io.WriteString(ji.JobInvocationOutput.Output, "test2\n")
-		io.WriteString(ji.JobInvocationOutput.Output, "test3\n")
-		io.WriteString(ji.JobInvocationOutput.Output, "test4\n")
-		io.WriteString(ji.JobInvocationOutput.Output, "test5\n")
+		io.WriteString(ji.State.(*JobInvocationOutput).Output, "test1\n")
+		io.WriteString(ji.State.(*JobInvocationOutput).Output, "test2\n")
+		io.WriteString(ji.State.(*JobInvocationOutput).Output, "test3\n")
+		io.WriteString(ji.State.(*JobInvocationOutput).Output, "test4\n")
+		io.WriteString(ji.State.(*JobInvocationOutput).Output, "test5\n")
 
 		<-finish
-		ji.JobInvocation.Status = cron.JobInvocationStatusSuccess
-		ji.JobInvocation.Complete = time.Now().UTC()
+		ji.Status = cron.JobInvocationStatusSuccess
+		ji.Complete = time.Now().UTC()
 
-		job.Job.(*Job).Lock()
-		job.Job.(*Job).Last = ji
-		job.Job.(*Job).Current = nil
-		job.Job.(*Job).Unlock()
+		jobScheduler.Lock()
+		jobScheduler.Last = ji
+		jobScheduler.Current = nil
+		jobScheduler.Unlock()
 	}()
 
 	assert.Nil(err)

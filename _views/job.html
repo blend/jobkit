@@ -34,9 +34,9 @@
 			</h1>
 		</div>
 		<div>
-			<span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="hashtag"></span>Failed Runs</span>
-			<h1 class="{{ if $stats.RunsFailed | eq 0 }}uk-text-primary{{else}}uk-text-danger{{end}}">
-				{{ $stats.RunsFailed }}
+			<span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="hashtag"></span>Errored Runs</span>
+			<h1 class="{{ if $stats.RunsErrored | eq 0 }}uk-text-primary{{else}}uk-text-danger{{end}}">
+				{{ $stats.RunsErrored }}
 			</h1>
 		</div>
 		<div>
@@ -55,46 +55,46 @@
     <div class="uk-grid uk-grid-divider uk-grid-small uk-child-width-1-5 uk-text-center">
 		<div class="uk-first-column uk-margin uk-margin-top">
             <span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="history"></span>History</span>
-            {{ if .ViewModel.Status.HistoryEnabled }}
-            <h1 class="uk-text-primary">Enabled</h1>
-            {{ else }}
+            {{ if .ViewModel.Config.HistoryDisabledOrDefault }}
             <h1 class="uk-text-danger">Disabled</h1>
+            {{ else }}
+            <h1 class="uk-text-primary">Enabled</h1>
             {{ end }}
         </div>
 		<div class="uk-margin">
             <span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="history"></span>History Persistence</span>
-            {{ if .ViewModel.Status.HistoryPersistenceEnabled }}
-            <h1 class="uk-text-primary">Enabled</h1>
-            {{ else }}
+            {{ if .ViewModel.Config.HistoryPersistenceDisabledOrDefault }}
             <h1 class="uk-text-danger">Disabled</h1>
+            {{ else }}
+            <h1 class="uk-text-primary">Enabled</h1>
             {{ end }}
         </div>
 		<div class="uk-margin">
             <span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="history"></span>History Retention</span>
-            {{ if .ViewModel.Status.HistoryMaxCount }}
-            <h1 class="uk-text-primary">{{ .ViewModel.Status.HistoryMaxCount }} items</h1>
-            {{ else if .ViewModel.Status.HistoryMaxAge }}
-            <h1 class="uk-text-primary">{{ .ViewModel.Status.HistoryMaxAge | duration_round_millis }} age</h1>
+            {{ if .ViewModel.Config.HistoryMaxCountOrDefault }}
+            <h1 class="uk-text-primary">{{ .ViewModel.Config.HistoryMaxCountOrDefault }} items</h1>
+            {{ else if .ViewModel.Config.HistoryMaxAgeOrDefault }}
+            <h1 class="uk-text-primary">{{ .ViewModel.Config.HistoryMaxAgeOrDefault | duration_round_millis }} age</h1>
             {{ else }}
             <h1>-</h1>
             {{ end }}
         </div>
     </div>
 	<hr/>
-	{{ if (.ViewModel | job).Config.Exec }}
+	{{ if .ViewModel.Config.Exec }}
 	<div class="uk-grid uk-grid-divider uk-grid-medium uk-child-width-1-1">
 		<div>
 			<span class="uk-text-small">Exec</span>
-			<pre>{{ (.ViewModel | job).Config.Exec | join " " }}</pre>
+			<pre>{{ .ViewModel.Config.Exec | join " " }}</pre>
 		</div>
 	</div>
 	<hr/>
 	{{ end }}
-	{{ if .ViewModel.Description }}
+	{{ if .ViewModel.Config.Description }}
 	<div class="uk-grid uk-grid-divider uk-grid-medium uk-child-width-1-1">
 		<div>
 			<span class="uk-text-small">Description</span>
-			<div>{{ .ViewModel.Description }}</div>
+			<div>{{ .ViewModel.Config.Description }}</div>
 		</div>
 	</div>
 	<hr/>
@@ -118,10 +118,10 @@
 		{{ if .ViewModel.Current }}
 			<tr>
 				<td class="uk-table-shrink">{{ .ViewModel.Current.Started | rfc3339 }}</td>
-				<td class="uk-table-shrink">{{ if .ViewModel.Current.Finished.IsZero }}-{{ else }}{{ .ViewModel.Current.Finished | rfc3339 }}{{ end }}</td>
+				<td class="uk-table-shrink">{{ if .ViewModel.Current.Complete.IsZero }}-{{ else }}{{ .ViewModel.Current.Complete | rfc3339 }}{{ end }}</td>
 				<td class="uk-table-shrink">{{ .ViewModel.Current.Parameters }}</td>
-				<td class="uk-table-shrink">{{ .ViewModel.Current.State }}</td>
-				<td class="uk-table-shrink">{{ if .ViewModel.Current.Finished.IsZero}}{{ .ViewModel.Current.Started | since_utc | duration_round_millis }}{{ else }}{{.ViewModel.Current.Elapsed | duration_round_millis }}{{end}}</td>
+				<td class="uk-table-shrink">{{ .ViewModel.Current.Status }}</td>
+				<td class="uk-table-shrink">{{ if .ViewModel.Current.Complete.IsZero}}{{ .ViewModel.Current.Started | since_utc | duration_round_millis }}{{ else }}{{.ViewModel.Current.Elapsed | duration_round_millis }}{{end}}</td>
 				<td class="uk-table-expand uk-text-truncate">{{ if .ViewModel.Current.Err }}<code>{{ .ViewModel.Current.Err }}</code>{{ else }}-{{end}}</td>
 				<td class="uk-table-shrink"><a class="uk-button uk-button-primary"href="/job.invocation/{{ .ViewModel.Current.JobName | urlencode }}/{{ .ViewModel.Current.ID }}">Output</td>
 			</tr>
@@ -129,9 +129,9 @@
 		{{ range $index, $ji := .ViewModel.History | reverse }}
 			<tr>
 				<td class="uk-table-shrink">{{ $ji.Started | rfc3339 }}</td>
-				<td class="uk-table-shrink">{{ if $ji.Finished.IsZero }}-{{ else }}{{ $ji.Finished | rfc3339 }}{{ end }}</td>
+				<td class="uk-table-shrink">{{ if $ji.Complete.IsZero }}-{{ else }}{{ $ji.Complete | rfc3339 }}{{ end }}</td>
 				<td class="uk-table-shrink">{{ $ji.Parameters | format_environ }}</td>
-				<td class="uk-table-shrink">{{ $ji.State }}</td>
+				<td class="uk-table-shrink">{{ $ji.Status }}</td>
 				<td class="uk-table-shrink">{{ $ji.Elapsed }}</td>
 				<td class="uk-table-expand uk-text-truncate">{{ if $ji.Err }}{{ $ji.Err }}{{ else }}-{{end}}</td>
 				<td class="uk-table-shrink"><a class="uk-button uk-button-secondary" href="/job.invocation/{{ $ji.JobName | urlencode }}/{{ $ji.ID }}">Output</td>
