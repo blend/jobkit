@@ -138,7 +138,7 @@ func (ms ManagementServer) ViewPaths() []string {
 
 // getStatus is mapped to GET /status.json
 func (ms ManagementServer) getStatus(r *web.Ctx) web.Result {
-	return web.JSON.Result(ms.Cron.Status())
+	return web.JSON.Result(ms.Cron.State())
 }
 
 // getStatic is mapped to GET /static/*filepath
@@ -186,12 +186,11 @@ func (ms ManagementServer) getSearch(r *web.Ctx) web.Result {
 	}
 	r.State.Set("selector", sel.String())
 
-	status := ms.Cron.Status()
-	status.Jobs = ms.filterJobSchedulers(status.Jobs, func(js cron.JobSchedulerStatus) bool {
-		return sel.Matches(js.Labels)
+	jobs := FilterJobViewModels(NewJobViewModels(ms.Cron.Jobs), func(job *JobViewModel) bool {
+		return sel.Matches(job.Labels)
 	})
 	r.State.Set("show-job-history-link", true)
-	return r.Views.View("index", status.Jobs)
+	return r.Views.View("index", jobs)
 }
 
 // getPause is mapped to GET /pause
@@ -200,6 +199,7 @@ func (ms ManagementServer) getPause(r *web.Ctx) web.Result {
 		return r.Views.BadRequest(err)
 	}
 	return web.RedirectWithMethod("GET", "/")
+
 }
 
 // getResume is mapped to GET /resume
@@ -306,12 +306,14 @@ func (ms ManagementServer) getJobInvocation(r *web.Ctx) web.Result {
 
 // getAPIJobs is mapped to GET /api/jobs
 func (ms ManagementServer) getAPIJobs(r *web.Ctx) web.Result {
-	return web.JSON.Result(ms.Cron.Status().Jobs)
+	return web.JSON.Result(NewJobViewModels(ms.Cron.Jobs))
 }
 
-// getAPIJobs is mapped to GET /api/jobs.running
+// getAPIJobsRunning is mapped to GET /api/jobs.running
 func (ms ManagementServer) getAPIJobsRunning(r *web.Ctx) web.Result {
-	return web.JSON.Result(ms.Cron.Status().Running)
+	return web.JSON.Result(FilterJobViewModels(NewJobViewModels(ms.Cron.Jobs), func(jvm *JobViewModel) bool {
+		return jvm.Current != nil
+	}))
 }
 
 // postAPIPause is mapped to POST /api/pause
@@ -575,14 +577,4 @@ func (ms ManagementServer) getRequestJobInvocation(r *web.Ctx, resultProvider we
 		return nil, resultProvider.NotFound()
 	}
 	return invocation, nil
-}
-
-func (ms ManagementServer) filterJobSchedulers(schedulers []cron.JobSchedulerStatus, predicate func(cron.JobSchedulerStatus) bool) []cron.JobSchedulerStatus {
-	var output []cron.JobSchedulerStatus
-	for _, js := range schedulers {
-		if predicate(js) {
-			output = append(output, js)
-		}
-	}
-	return output
 }

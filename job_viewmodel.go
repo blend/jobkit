@@ -20,6 +20,16 @@ func NewJobViewModels(jobs map[string]*cron.JobScheduler) (output []*JobViewMode
 	return
 }
 
+// FilterJobViewModels filters a set of job view models by a predicate.
+func FilterJobViewModels(jobs []*JobViewModel, predicate func(*JobViewModel) bool) (output []*JobViewModel) {
+	for _, job := range jobs {
+		if predicate(job) {
+			output = append(output, job)
+		}
+	}
+	return
+}
+
 // NewJobViewModel returns a job view model from a job scheduler.
 func NewJobViewModel(js *cron.JobScheduler) *JobViewModel {
 	typed, ok := js.Job.(*Job)
@@ -28,6 +38,7 @@ func NewJobViewModel(js *cron.JobScheduler) *JobViewModel {
 	}
 	return &JobViewModel{
 		Name:          typed.Name(),
+		Labels:        js.Labels(),
 		Config:        typed.JobConfig,
 		Stats:         typed.Stats(),
 		Schedule:      typed.JobSchedule,
@@ -42,6 +53,7 @@ func NewJobViewModel(js *cron.JobScheduler) *JobViewModel {
 // JobViewModel is a viewmodel that represents a job.
 type JobViewModel struct {
 	Name          string
+	Labels        map[string]string
 	Config        JobConfig
 	Stats         JobStats
 	Schedule      cron.Schedule
