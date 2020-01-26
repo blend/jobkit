@@ -120,11 +120,11 @@ func TestManagementServerResume(t *testing.T) {
 	assert := assert.New(t)
 
 	jm, app := createTestManagementServer()
-
+	jm.Log = logger.All()
 	jm.StartAsync()
 	defer jm.Stop()
 
-	jm.Stop()
+	assert.Nil(jm.Stop())
 	assert.True(jm.Latch.IsStopped())
 
 	meta, err := web.MockGet(app, "/resume").Discard()

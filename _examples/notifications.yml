@@ -11,7 +11,7 @@ jobs:
     labels:
       team: "bailey"
       sla: false
-    schedule: "@every 5s"
+    schedule: "@every 60s"
     historyDisabled: false
     historyPersistenceDisabled: false
     notifications:

@@ -45,7 +45,7 @@ profanity:
 
 test:
 	@echo "$(VERSION)/$(GIT_REF) >> test"
-	@go test ./... -timeout 10s
+	@go test ./... -timeout 5s
 
 cover:
 	@echo "$(VERSION)/$(GIT_REF) >> coverage"

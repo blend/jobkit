@@ -40,7 +40,14 @@ func TestNewJob(t *testing.T) {
 	assert.Nil(err)
 	assert.NotNil(job)
 	assert.Equal(2*time.Second, job.JobSchedule.(cron.IntervalSchedule).Every)
-	assert.Nil(job.Execute(context.Background()))
+
+	ctx := cron.WithJobInvocation(context.Background(), &cron.JobInvocation{
+		ID:      cron.NewJobInvocationID(),
+		JobName: job.Name(),
+		Started: cron.Now(),
+	})
+
+	assert.Nil(job.Execute(ctx))
 	assert.True(didCallAction)
 }
 

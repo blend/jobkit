@@ -50,6 +50,9 @@ func NewJob(wrapped cron.Job, options ...JobOption) (*Job, error) {
 			return nil, err
 		}
 	}
+	if job.HistoryProvider == nil {
+		job.HistoryProvider = HistoryJSON{Config: job.JobConfig}
+	}
 	return job, nil
 }
 
@@ -215,7 +218,7 @@ func (job *Job) Lifecycle() (output cron.JobLifecycle) {
 // OnLoad implements job on load handler.
 func (job *Job) OnLoad(ctx context.Context) error {
 	if err := job.RestoreHistory(ctx); err != nil {
-		return err
+		logger.MaybeErrorContext(ctx, job.Log, err)
 	}
 
 	job.NotificationsQueueEmail = NewRetryQueue(job.notifyEmail)
@@ -527,6 +530,10 @@ func (job *Job) AddHistoryResult(ji *JobInvocation) {
 	}
 
 	job.History = append(job.History, ji)
+
+	if job.HistoryLookup == nil {
+		job.HistoryLookup = make(map[string]*JobInvocation)
+	}
 	job.HistoryLookup[ji.ID] = ji
 
 	count := len(job.History)
