@@ -121,23 +121,23 @@ func createTestJobManager() *cron.JobManager {
 		},
 	}
 
-	jm.Jobs["test0"].Job.(*Job).History = []*JobInvocation{
+	jm.Jobs["test0"].Job.(*Job).appendResultsUnsafe(
 		createTestCompleteJobInvocation("test0", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test0", 250*time.Millisecond),
 		createTestFailedJobInvocation("test0", 5*time.Second, fmt.Errorf("this is only a test %s", uuid.V4().String())),
-	}
-	jm.Jobs["test1"].Job.(*Job).History = []*JobInvocation{
+	)
+	jm.Jobs["test1"].Job.(*Job).appendResultsUnsafe(
 		createTestCompleteJobInvocation("test1", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test1", 250*time.Millisecond),
 		createTestCompleteJobInvocation("test1", 300*time.Millisecond),
 		createTestCompleteJobInvocation("test1", 350*time.Millisecond),
-	}
-	jm.Jobs["test2 job.foo"].Job.(*Job).History = []*JobInvocation{
+	)
+	jm.Jobs["test2 job.foo"].Job.(*Job).appendResultsUnsafe(
 		createTestCompleteJobInvocation("test2 job.foo", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test2 job.foo", 250*time.Millisecond),
 		createTestCompleteJobInvocation("test2 job.foo", 300*time.Millisecond),
 		createTestCompleteJobInvocation("test2 job.foo", 350*time.Millisecond),
-	}
+	)
 	return jm
 }
 

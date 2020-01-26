@@ -42,17 +42,26 @@ func TestManagmentServerGetRequestJobInvocation(t *testing.T) {
 		Cron: jm,
 	}
 
+	// test failure cases ...
+	r := web.MockCtx("GET", "/job/test2+job.foo/",
+		web.OptCtxRouteParamValue("jobName", "test2 job.foo"),
+	)
+	found, res := ms.getRequestJobInvocation(r, web.Text)
+	assert.NotNil(res)
+	assert.Nil(found)
+
 	jobScheduler, err := jm.Job("test2 job.foo")
 	assert.Nil(err)
 	assert.NotNil(jobScheduler)
+
 	invocation := jobScheduler.Job.(*Job).History[2]
 	id := invocation.JobInvocation.ID
 
-	r := web.MockCtx("GET", "/job.invocation/test2+job.foo/"+id,
+	r = web.MockCtx("GET", "/job/test2+job.foo/"+id,
 		web.OptCtxRouteParamValue("jobName", "test2+job.foo"),
 		web.OptCtxRouteParamValue("id", id),
 	)
-	found, res := ms.getRequestJobInvocation(r, web.Text)
+	found, res = ms.getRequestJobInvocation(r, web.Text)
 	assert.Nil(res)
 	assert.NotNil(found)
 	assert.Equal("test2 job.foo", found.JobInvocation.JobName)
@@ -120,8 +129,9 @@ func TestManagementServerResume(t *testing.T) {
 	assert := assert.New(t)
 
 	jm, app := createTestManagementServer()
-	jm.Log = logger.All()
+
 	jm.StartAsync()
+	<-jm.Latch.NotifyStarted()
 	defer jm.Stop()
 
 	assert.Nil(jm.Stop())
@@ -212,7 +222,7 @@ func TestManagementServerJobRun(t *testing.T) {
 
 	meta, err := web.MockGet(app, fmt.Sprintf("/job.run/%s", jobName)).Discard()
 	assert.Nil(err)
-	assert.Equal(http.StatusOK, meta.StatusCode)
+	assert.Equal(http.StatusTemporaryRedirect, meta.StatusCode)
 	assert.NotNil(job.Last)
 }
 
@@ -256,7 +266,7 @@ func TestManagementServerJobInvocation(t *testing.T) {
 	jobName := job.Name()
 	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
 
-	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job.invocation/%s/%s", jobName, invocationID)).Bytes()
+	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job/%s/%s", jobName, invocationID)).Bytes()
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode, string(contents))
 	assert.Contains(string(contents), jobName)
@@ -274,7 +284,7 @@ func TestManagementServerJobInvocationCurrent(t *testing.T) {
 	jobName := job.Name()
 	invocationID := job.Current.ID
 
-	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job.invocation/%s/current", jobName)).Bytes()
+	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job/%s/current", jobName)).Bytes()
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode, string(contents))
 	assert.Contains(string(contents), jobName)
@@ -286,7 +296,7 @@ func TestManagementServerJobInvocationNotFound(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	meta, err := web.MockGet(app, fmt.Sprintf("/job.invocation/%s/%s", uuid.V4().String(), uuid.V4().String())).Discard()
+	meta, err := web.MockGet(app, fmt.Sprintf("/job/%s/%s", uuid.V4().String(), uuid.V4().String())).Discard()
 	assert.Nil(err)
 	assert.Equal(http.StatusNotFound, meta.StatusCode)
 
@@ -294,7 +304,7 @@ func TestManagementServerJobInvocationNotFound(t *testing.T) {
 	assert.NotNil(job)
 	jobName := job.Name()
 
-	meta, err = web.MockGet(app, fmt.Sprintf("/job.invocation/%s/%s", jobName, uuid.V4().String())).Discard()
+	meta, err = web.MockGet(app, fmt.Sprintf("/job/%s/%s", jobName, uuid.V4().String())).Discard()
 	assert.Nil(err)
 	assert.Equal(http.StatusNotFound, meta.StatusCode)
 }
@@ -462,7 +472,7 @@ func TestManagementServerAPIJobInvocation(t *testing.T) {
 	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
 
 	var ji cron.JobInvocation
-	meta, err := web.MockGet(app, fmt.Sprintf("/api/job.invocation/%s/%s", jobName, invocationID)).JSON(&ji)
+	meta, err := web.MockGet(app, fmt.Sprintf("/api/job/%s/%s", jobName, invocationID)).JSON(&ji)
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode)
 	assert.Equal(jobName, ji.JobName)
@@ -484,7 +494,7 @@ func TestManagementServerAPIJobInvocationOutput(t *testing.T) {
 		ServerTimeNanos int64                    `json:"serverTimeNanos"`
 		Chunks          []bufferutil.BufferChunk `json:"chunks"`
 	}
-	meta, err := web.MockGet(app, fmt.Sprintf("/api/job.invocation.output/%s/%s", jobName, invocationID)).JSON(&output)
+	meta, err := web.MockGet(app, fmt.Sprintf("/api/job.output/%s/%s", jobName, invocationID)).JSON(&output)
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode)
 	assert.NotZero(output.ServerTimeNanos)
@@ -509,7 +519,7 @@ func TestManagementServerAPIJobInvocationOutputAfterNanos(t *testing.T) {
 		Chunks          []bufferutil.BufferChunk `json:"chunks"`
 	}
 	meta, err := web.MockGet(app,
-		fmt.Sprintf("/api/job.invocation.output/%s/%s", jobName, invocationID),
+		fmt.Sprintf("/api/job.output/%s/%s", jobName, invocationID),
 		r2.OptQueryValue("afterNanos", fmt.Sprint(afterNanos)),
 	).JSON(&output)
 
@@ -558,7 +568,7 @@ func TestManagementServerAPIJobInvocationOutputStreamComplete(t *testing.T) {
 	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
 
 	res, err := web.MockGet(app,
-		fmt.Sprintf("/api/job.invocation.output.stream/%s/%s", jobName, invocationID),
+		fmt.Sprintf("/api/job.output.stream/%s/%s", jobName, invocationID),
 		r2.OptQueryValue("afterNanos", "baileydog"),
 	).Do()
 
@@ -585,7 +595,7 @@ func TestManagementServerAPIJobInvocationOutputStream(t *testing.T) {
 	invocationID := ji.ID
 
 	res, err := web.MockGet(app,
-		fmt.Sprintf("/api/job.invocation.output.stream/%s/%s", jobName, invocationID),
+		fmt.Sprintf("/api/job.output.stream/%s/%s", jobName, invocationID),
 		r2.OptQueryValue("afterNanos", "baileydog"),
 	).Do()
 

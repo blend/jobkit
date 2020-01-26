@@ -171,7 +171,11 @@ func (ms ManagementServer) getStatic(r *web.Ctx) web.Result {
 // getIndex is mapped to GET /
 func (ms ManagementServer) getIndex(r *web.Ctx) web.Result {
 	r.State.Set("show-job-history-link", true)
-	return r.Views.View("index", NewJobViewModels(ms.Cron.Jobs))
+	jobs, err := NewJobViewModels(ms.Cron.Jobs)
+	if err != nil {
+		return r.Views.InternalError(err)
+	}
+	return r.Views.View("index", jobs)
 }
 
 // getIndex is mapped to GET /search?selector=<SELECTOR>
@@ -186,7 +190,11 @@ func (ms ManagementServer) getSearch(r *web.Ctx) web.Result {
 	}
 	r.State.Set("selector", sel.String())
 
-	jobs := FilterJobViewModels(NewJobViewModels(ms.Cron.Jobs), func(job *JobViewModel) bool {
+	jobs, err := NewJobViewModels(ms.Cron.Jobs)
+	if err != nil {
+		return r.Views.InternalError(err)
+	}
+	jobs = FilterJobViewModels(jobs, func(job *JobViewModel) bool {
 		return sel.Matches(job.Labels)
 	})
 	r.State.Set("show-job-history-link", true)
@@ -199,7 +207,6 @@ func (ms ManagementServer) getPause(r *web.Ctx) web.Result {
 		return r.Views.BadRequest(err)
 	}
 	return web.RedirectWithMethod("GET", "/")
-
 }
 
 // getResume is mapped to GET /resume
@@ -250,7 +257,6 @@ func (ms ManagementServer) getJobRun(r *web.Ctx) web.Result {
 
 	parameters := job.Config.Parameters
 	parameterValues := ParameterValuesFromForm(parameters, r.Request.Form)
-
 	ji, err := jobScheduler.RunAsyncContext(cron.WithJobParameters(context.Background(), parameterValues))
 	if err != nil {
 		return r.Views.BadRequest(err)
@@ -306,12 +312,20 @@ func (ms ManagementServer) getJobInvocation(r *web.Ctx) web.Result {
 
 // getAPIJobs is mapped to GET /api/jobs
 func (ms ManagementServer) getAPIJobs(r *web.Ctx) web.Result {
-	return web.JSON.Result(NewJobViewModels(ms.Cron.Jobs))
+	jobs, err := NewJobViewModels(ms.Cron.Jobs)
+	if err != nil {
+		return r.Views.InternalError(err)
+	}
+	return web.JSON.Result(jobs)
 }
 
 // getAPIJobsRunning is mapped to GET /api/jobs.running
 func (ms ManagementServer) getAPIJobsRunning(r *web.Ctx) web.Result {
-	return web.JSON.Result(FilterJobViewModels(NewJobViewModels(ms.Cron.Jobs), func(jvm *JobViewModel) bool {
+	jobs, err := NewJobViewModels(ms.Cron.Jobs)
+	if err != nil {
+		return r.Views.InternalError(err)
+	}
+	return web.JSON.Result(FilterJobViewModels(jobs, func(jvm *JobViewModel) bool {
 		return jvm.Current != nil
 	}))
 }
@@ -546,8 +560,8 @@ func (ms ManagementServer) getRequestJob(r *web.Ctx, resultProvider web.ResultPr
 	if err != nil || jobScheduler == nil {
 		return nil, resultProvider.NotFound()
 	}
-	jvm := NewJobViewModel(jobScheduler)
-	if jvm == nil {
+	jvm, err := NewJobViewModel(jobScheduler)
+	if err != nil {
 		return nil, resultProvider.NotFound()
 	}
 	return jvm, nil

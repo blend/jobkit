@@ -5,19 +5,25 @@ import (
 	"time"
 
 	"github.com/blend/go-sdk/cron"
+	"github.com/blend/go-sdk/ex"
 )
 
 // NewJobViewModels returns the job view models.
-func NewJobViewModels(jobs map[string]*cron.JobScheduler) (output []*JobViewModel) {
+func NewJobViewModels(jobs map[string]*cron.JobScheduler) ([]*JobViewModel, error) {
 	var jobSchedulers []*cron.JobScheduler
 	for _, jobScheduler := range jobs {
 		jobSchedulers = append(jobSchedulers, jobScheduler)
 	}
 	sort.Sort(cron.JobSchedulersByJobNameAsc(jobSchedulers))
+	var output []*JobViewModel
 	for _, jobScheduler := range jobSchedulers {
-		output = append(output, NewJobViewModel(jobScheduler))
+		jvm, err := NewJobViewModel(jobScheduler)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, jvm)
 	}
-	return
+	return output, nil
 }
 
 // FilterJobViewModels filters a set of job view models by a predicate.
@@ -31,10 +37,10 @@ func FilterJobViewModels(jobs []*JobViewModel, predicate func(*JobViewModel) boo
 }
 
 // NewJobViewModel returns a job view model from a job scheduler.
-func NewJobViewModel(js *cron.JobScheduler) *JobViewModel {
+func NewJobViewModel(js *cron.JobScheduler) (*JobViewModel, error) {
 	typed, ok := js.Job.(*Job)
 	if !ok {
-		panic("NewJobViewModel; job scheduler job is not a *Job")
+		return nil, ex.New("invalid job type; must be a *jobkit.Job")
 	}
 	return &JobViewModel{
 		Name:          typed.Name(),
@@ -47,7 +53,7 @@ func NewJobViewModel(js *cron.JobScheduler) *JobViewModel {
 		Last:          NewJobInvocation(js.Last),
 		History:       typed.History,
 		HistoryLookup: typed.HistoryLookup,
-	}
+	}, nil
 }
 
 // JobViewModel is a viewmodel that represents a job.

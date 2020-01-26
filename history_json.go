@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/blend/go-sdk/cron"
 	"github.com/blend/go-sdk/ex"
 	"github.com/blend/go-sdk/stringutil"
 )
@@ -24,11 +23,7 @@ func (hj HistoryJSON) PersistHistory(ctx context.Context, history []*JobInvocati
 			return ex.New(err)
 		}
 	}
-	ji := cron.GetJobInvocation(ctx)
-	if ji == nil {
-		return nil
-	}
-	historyPath := filepath.Join(historyDirectory, stringutil.Slugify(ji.JobName)+".json")
+	historyPath := filepath.Join(historyDirectory, stringutil.Slugify(hj.Config.Name)+".json")
 	f, err := os.Create(historyPath)
 	if err != nil {
 		return err
@@ -39,11 +34,7 @@ func (hj HistoryJSON) PersistHistory(ctx context.Context, history []*JobInvocati
 
 // RestoreHistory reads history from disk and returns the log.
 func (hj HistoryJSON) RestoreHistory(ctx context.Context) (output []*JobInvocation, err error) {
-	ji := cron.GetJobInvocation(ctx)
-	if ji == nil {
-		return nil, nil
-	}
-	historyPath := filepath.Join(hj.Config.HistoryPathOrDefault(), stringutil.Slugify(ji.JobName)+".json")
+	historyPath := filepath.Join(hj.Config.HistoryPathOrDefault(), stringutil.Slugify(hj.Config.Name)+".json")
 	if _, statErr := os.Stat(historyPath); statErr != nil {
 		return
 	}
@@ -53,6 +44,14 @@ func (hj HistoryJSON) RestoreHistory(ctx context.Context) (output []*JobInvocati
 		return
 	}
 	defer f.Close()
-	err = json.NewDecoder(f).Decode(&output)
+
+	var intermediate []JobInvocation
+	if err = ex.New(json.NewDecoder(f).Decode(&intermediate)); err != nil {
+		return
+	}
+	output = make([]*JobInvocation, len(intermediate))
+	for index := range intermediate {
+		output[index] = &intermediate[index]
+	}
 	return
 }

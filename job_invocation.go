@@ -61,17 +61,23 @@ func (ji JobInvocation) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON unmarhsals
 func (ji *JobInvocation) UnmarshalJSON(contents []byte) error {
 	var values struct {
-		ID       string                   `json:"id"`
-		JobName  string                   `json:"jobName"`
-		Started  time.Time                `json:"started"`
-		Complete time.Time                `json:"complete"`
-		Status   cron.JobInvocationStatus `json:"status"`
-		Error    string                   `json:"err"`
-		Output   json.RawMessage          `json:"output"`
+		ID         string                   `json:"id"`
+		JobName    string                   `json:"jobName"`
+		Started    time.Time                `json:"started"`
+		Complete   time.Time                `json:"complete"`
+		Status     cron.JobInvocationStatus `json:"status"`
+		Error      string                   `json:"err"`
+		Parameters map[string]string        `json:"parameters"`
+		Output     json.RawMessage          `json:"output"`
 	}
 	if err := json.Unmarshal(contents, &values); err != nil {
 		return ex.New(err)
 	}
+	// because we embed a pointer
+	// for various reasons
+	// we have to initialize it.
+	ji.JobInvocation = new(cron.JobInvocation)
+
 	ji.ID = values.ID
 	ji.JobName = values.JobName
 	ji.Started = values.Started

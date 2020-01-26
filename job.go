@@ -528,14 +528,26 @@ func (job *Job) AddHistoryResult(ji *JobInvocation) {
 	if ji == nil {
 		panic("AddHistoryResult; passed a nil job invocation; what was missing?")
 	}
+	job.appendResultsUnsafe(ji)
+	job.cullResultsUnsafe()
+}
 
-	job.History = append(job.History, ji)
+// appendResultsUnsafe appends invocation results.
+// It assumes the job history lock is acquired.
+func (job *Job) appendResultsUnsafe(invocations ...*JobInvocation) {
+	job.History = append(job.History, invocations...)
 
 	if job.HistoryLookup == nil {
 		job.HistoryLookup = make(map[string]*JobInvocation)
 	}
-	job.HistoryLookup[ji.ID] = ji
+	for _, ji := range invocations {
+		job.HistoryLookup[ji.ID] = ji
+	}
+}
 
+// cullResultsUnsafe cullts expired results.
+// It assumes the job history lock is acquired.
+func (job *Job) cullResultsUnsafe() {
 	count := len(job.History)
 	maxCount := job.JobConfig.HistoryMaxCountOrDefault()
 	maxAge := job.JobConfig.HistoryMaxAgeOrDefault()
@@ -562,7 +574,6 @@ func (job *Job) AddHistoryResult(ji *JobInvocation) {
 		delete(job.HistoryLookup, id)
 	}
 	job.History = filtered
-
 }
 
 // Stats returns job stats.
