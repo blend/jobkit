@@ -256,6 +256,10 @@ func (job *Job) OnLoad(ctx context.Context) error {
 
 // OnUnload implements job on unload handler.
 func (job *Job) OnUnload(ctx context.Context) error {
+	if err := job.PersistHistory(ctx); err != nil {
+		logger.MaybeErrorContext(ctx, job.Log, err)
+	}
+
 	if job.NotificationsQueueEmail != nil {
 		job.NotificationsQueueEmail.Stop()
 	}
@@ -286,7 +290,9 @@ func (job *Job) OnSuccess(ctx context.Context) {
 
 // OnComplete is a lifecycle event handler.
 func (job *Job) OnComplete(ctx context.Context) {
-	// SPECIAL ON COMPLETE STEPS!
+	// NOTE: because `OnComplete` happens for _every_ invocation
+	// we manage history here.
+
 	job.AddHistoryResult(NewJobInvocation(cron.GetJobInvocation(ctx)))
 	job.PersistHistory(ctx)
 
@@ -399,8 +405,6 @@ func (job *Job) sendStats(ctx context.Context, flag string) {
 			job.Debugf(ctx, "stats; sending stats to collector")
 			job.Error(ctx, job.StatsClient.TimeInMilliseconds(string(flag), ji.Elapsed(), fmt.Sprintf("%s:%s", stats.TagJob, job.Name())))
 		}
-	} else {
-		job.Debugf(ctx, "stats; client unset, skipping logging stats")
 	}
 }
 
@@ -491,12 +495,15 @@ func (job *Job) notify(ctx context.Context, flag string) {
 // RestoreHistory calls the persist handler if it's set.
 func (job *Job) RestoreHistory(ctx context.Context) error {
 	if job.JobConfig.HistoryDisabledOrDefault() {
+		logger.MaybeDebugfContext(ctx, job.Log, "restoring history: history disabled")
 		return nil
 	}
 	if job.JobConfig.HistoryPersistenceDisabledOrDefault() {
+		logger.MaybeDebugfContext(ctx, job.Log, "restoring history: history persistence disabled")
 		return nil
 	}
 	if job.HistoryProvider == nil {
+		logger.MaybeDebugfContext(ctx, job.Log, "restoring history: history provider unset")
 		return nil
 	}
 
@@ -504,6 +511,7 @@ func (job *Job) RestoreHistory(ctx context.Context) error {
 	defer job.Unlock()
 
 	logger.MaybeDebugfContext(ctx, job.Log, "restoring history")
+
 	var err error
 	if job.History, err = job.HistoryProvider.RestoreHistory(ctx); err != nil {
 		return job.Error(ctx, err)
@@ -514,17 +522,21 @@ func (job *Job) RestoreHistory(ctx context.Context) error {
 // PersistHistory calls the persist handler if it's set.
 func (job *Job) PersistHistory(ctx context.Context) error {
 	if job.JobConfig.HistoryDisabledOrDefault() {
+		logger.MaybeDebugfContext(ctx, job.Log, "persisting history: history disabled")
 		return nil
 	}
 	if job.JobConfig.HistoryPersistenceDisabledOrDefault() {
+		logger.MaybeDebugfContext(ctx, job.Log, "persisting history: history persistence disabled")
 		return nil
 	}
 	if job.HistoryProvider == nil {
+		logger.MaybeDebugfContext(ctx, job.Log, "persisting history: history provider unset")
 		return nil
 	}
 
 	job.Lock()
 	defer job.Unlock()
+
 	logger.MaybeDebugfContext(ctx, job.Log, "persisting history")
 
 	historyCopy := make([]*JobInvocation, len(job.History))
@@ -536,15 +548,20 @@ func (job *Job) PersistHistory(ctx context.Context) error {
 }
 
 // AddHistoryResult adds an item to history and culls old items.
-func (job *Job) AddHistoryResult(ji *JobInvocation) {
+func (job *Job) AddHistoryResult(ji *JobInvocation) error {
+	if ji == nil {
+		return ex.New("history result is unset, cannot continue")
+	}
+	if ji.Complete.IsZero() {
+		logger.MaybeWarningfContext(ji.Context, job.Log, "AddHistoryResult: history result has an unset complete time")
+	}
+
 	job.Lock()
 	defer job.Unlock()
 
-	if ji == nil {
-		panic("AddHistoryResult; passed a nil job invocation; what was missing?")
-	}
 	job.appendResultsUnsafe(ji)
 	job.cullResultsUnsafe()
+	return nil
 }
 
 // appendResultsUnsafe appends invocation results.

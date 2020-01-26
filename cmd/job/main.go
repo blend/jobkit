@@ -78,6 +78,9 @@ func (c *config) Resolve() error {
 	if len(c.Logger.Flags) == 0 {
 		c.Logger.Flags = []string{"all"}
 	}
+	if err := c.Config.Resolve(); err != nil {
+		return err
+	}
 	return configutil.AnyError(
 		configutil.SetString(&c.Title, configutil.String(*flagTitle), configutil.Env("HOSTNAME"), configutil.String(c.Title)),
 		configutil.SetString(&c.Web.BindAddr, configutil.String(*flagBind), configutil.Env("BIND_ADDR"), configutil.String(c.Web.BindAddr)),
@@ -212,6 +215,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Debugf("using logger flags: %v", log.Flags.String())
+	log.Debugf("using logger format: %v", cfg.Logger.FormatOrDefault())
 
 	if len(args) > 0 {
 		defaultJobCfg, err := createDefaultJobConfig(args...)
@@ -267,7 +271,7 @@ func run(cmd *cobra.Command, args []string) error {
 	)
 
 	for _, jobCfg := range cfg.Jobs {
-		job, err := createJobFromConfig(cfg, jobCfg)
+		job, err := createJobFromConfig(cfg, jobCfg, jobs.Log)
 		if err != nil {
 			return err
 		}
@@ -330,7 +334,7 @@ func createDefaultJobConfig(args ...string) (*defaultJobConfig, error) {
 	return cfg, nil
 }
 
-func createJobFromConfig(base config, cfg jobkit.JobConfig) (*jobkit.Job, error) {
+func createJobFromConfig(base config, cfg jobkit.JobConfig, log logger.Log) (*jobkit.Job, error) {
 	if len(cfg.Exec) == 0 {
 		return nil, ex.New("job exec and command unset", ex.OptMessagef("job: %s", cfg.Name))
 	}
@@ -345,6 +349,7 @@ func createJobFromConfig(base config, cfg jobkit.JobConfig) (*jobkit.Job, error)
 		),
 		jobkit.OptJobConfig(cfg),
 		jobkit.OptJobParsedSchedule(cfg.Schedule),
+		jobkit.OptJobLog(log),
 	)
 	if err != nil {
 		return nil, err

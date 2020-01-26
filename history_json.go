@@ -44,14 +44,6 @@ func (hj HistoryJSON) RestoreHistory(ctx context.Context) (output []*JobInvocati
 		return
 	}
 	defer f.Close()
-
-	var intermediate []JobInvocation
-	if err = ex.New(json.NewDecoder(f).Decode(&intermediate)); err != nil {
-		return
-	}
-	output = make([]*JobInvocation, len(intermediate))
-	for index := range intermediate {
-		output[index] = &intermediate[index]
-	}
+	err = ex.New(json.NewDecoder(f).Decode(&output))
 	return
 }
