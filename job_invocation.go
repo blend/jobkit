@@ -16,7 +16,7 @@ func NewJobInvocation(ji *cron.JobInvocation) *JobInvocation {
 		return nil
 	}
 	invocation := &JobInvocation{
-		JobInvocation: *ji,
+		JobInvocation: ji,
 	}
 	if typed, ok := ji.State.(*JobInvocationOutput); ok && typed != nil {
 		invocation.JobInvocationOutput = *typed
@@ -31,7 +31,7 @@ var (
 
 // JobInvocation is a serialized form of a job invocation.
 type JobInvocation struct {
-	cron.JobInvocation
+	*cron.JobInvocation
 	JobInvocationOutput
 }
 

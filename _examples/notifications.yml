@@ -10,9 +10,10 @@ jobs:
   - name: "hello world"
     labels:
       team: "bailey"
-    schedule: "*/10 * * * *"
+      sla: false
+    schedule: "@every 5s"
     historyDisabled: false
-    historyPersistenceDisabled: true
+    historyPersistenceDisabled: false
     notifications:
       retryWait: "5s"
       maxAttempts: 5

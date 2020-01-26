@@ -45,7 +45,7 @@ func createTestBufferChunk(index int) bufferutil.BufferChunk {
 func createTestCompleteJobInvocation(jobName string, elapsed time.Duration) *JobInvocation {
 	ts := time.Now().UTC()
 	return &JobInvocation{
-		JobInvocation: cron.JobInvocation{
+		JobInvocation: &cron.JobInvocation{
 			ID:       uuid.V4().String(),
 			JobName:  jobName,
 			Started:  ts,
@@ -69,7 +69,7 @@ func createTestCompleteJobInvocation(jobName string, elapsed time.Duration) *Job
 func createTestFailedJobInvocation(jobName string, elapsed time.Duration, err error) *JobInvocation {
 	ts := time.Now().UTC()
 	return &JobInvocation{
-		JobInvocation: cron.JobInvocation{
+		JobInvocation: &cron.JobInvocation{
 			ID:       uuid.V4().String(),
 			JobName:  jobName,
 			Started:  ts,

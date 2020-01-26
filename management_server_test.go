@@ -351,8 +351,8 @@ func TestManagementServerAPIJob(t *testing.T) {
 	assert.NotNil(job)
 	jobName := job.Name()
 
-	var job JobViewModel
-	meta, err := web.MockGet(app, fmt.Sprintf("/api/job/%s", jobName)).JSON(&js)
+	var jvm JobViewModel
+	meta, err := web.MockGet(app, fmt.Sprintf("/api/job/%s", jobName)).JSON(&jvm)
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode)
 	assert.Equal(jobName, job.Name)
