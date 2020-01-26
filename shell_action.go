@@ -8,6 +8,7 @@ import (
 
 	"github.com/blend/go-sdk/cron"
 	"github.com/blend/go-sdk/ex"
+	"github.com/blend/go-sdk/logger"
 	"github.com/blend/go-sdk/sh"
 )
 
@@ -29,11 +30,17 @@ func OptShellActionConfig(cfg ShellActionConfig) ShellActionOption {
 	return func(so *ShellAction) { so.Config = cfg }
 }
 
+// OptShellActionLog sets the shell action logger.
+func OptShellActionLog(log logger.Log) ShellActionOption {
+	return func(so *ShellAction) { so.Log = log }
+}
+
 // ShellActionOption is a mutator for a shell action.
 type ShellActionOption func(*ShellAction)
 
 // ShellAction captures options for a shell action.
 type ShellAction struct {
+	Log    logger.Log
 	Config ShellActionConfig
 }
 
@@ -65,8 +72,14 @@ func (se ShellAction) Execute(ctx context.Context) error {
 	cmd.Env = append(os.Environ(), ParameterValuesAsEnviron(ji.Parameters)...)
 	if !se.Config.DiscardOutputOrDefault() {
 		if !se.Config.HideOutputOrDefault() {
-			cmd.Stdout = io.MultiWriter(jio.Output, os.Stdout)
-			cmd.Stderr = io.MultiWriter(jio.Output, os.Stderr)
+			if se.Log != nil {
+				logOutput := logOutputStream{ctx, se.Log}
+				cmd.Stdout = io.MultiWriter(jio.Output, logOutput)
+				cmd.Stderr = io.MultiWriter(jio.Output, logOutput)
+			} else {
+				cmd.Stdout = io.MultiWriter(jio.Output, os.Stdout)
+				cmd.Stderr = io.MultiWriter(jio.Output, os.Stderr)
+			}
 		} else {
 			cmd.Stdout = jio.Output
 			cmd.Stderr = jio.Output
@@ -76,4 +89,23 @@ func (se ShellAction) Execute(ctx context.Context) error {
 		cmd.Stderr = os.Stderr
 	}
 	return ex.New(cmd.Run())
+}
+
+// Logger Constants
+const (
+	ShellActionLogFlag = "shell.action"
+)
+
+type logOutputStream struct {
+	Context context.Context
+	Log     logger.Log
+}
+
+func (los logOutputStream) Write(contents []byte) (count int, err error) {
+	if los.Log == nil {
+		return
+	}
+	los.Log.Trigger(los.Context, logger.NewMessageEvent(ShellActionLogFlag, string(contents)))
+	count = len(contents)
+	return
 }

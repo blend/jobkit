@@ -75,9 +75,6 @@ type config struct {
 }
 
 func (c *config) Resolve() error {
-	if len(c.Logger.Flags) == 0 {
-		c.Logger.Flags = []string{"all"}
-	}
 	if err := c.Config.Resolve(); err != nil {
 		return err
 	}
@@ -340,6 +337,7 @@ func createJobFromConfig(base config, cfg jobkit.JobConfig, log logger.Log) (*jo
 	}
 	action := jobkit.NewShellAction(cfg.Exec,
 		jobkit.OptShellActionConfig(cfg.ShellActionConfig),
+		jobkit.OptShellActionLog(log),
 	)
 	job, err := jobkit.NewJob(
 		cron.NewJob(
