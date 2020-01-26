@@ -203,7 +203,10 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	log, err := logger.New(logger.OptConfig(cfg.Logger), logger.OptPath(cfg.TitleOrDefault()))
+	log, err := logger.New(
+		logger.OptConfig(cfg.Logger),
+		logger.OptPath(cfg.TitleOrDefault()),
+	)
 	if err != nil {
 		return err
 	}
@@ -269,7 +272,6 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		job.Log = log
 		job.EmailClient = emailClient
 		job.SlackClient = slackClient
 		job.StatsClient = statsClient

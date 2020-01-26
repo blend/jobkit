@@ -45,6 +45,7 @@ func NewJobViewModel(js *cron.JobScheduler) (*JobViewModel, error) {
 	return &JobViewModel{
 		Name:          typed.Name(),
 		Labels:        js.Labels(),
+		Disabled:      js.Disabled(),
 		Config:        typed.JobConfig,
 		Stats:         typed.Stats(),
 		Schedule:      typed.JobSchedule,
@@ -60,6 +61,7 @@ func NewJobViewModel(js *cron.JobScheduler) (*JobViewModel, error) {
 type JobViewModel struct {
 	Name          string
 	Labels        map[string]string
+	Disabled      bool
 	Config        JobConfig
 	Stats         JobStats
 	Schedule      cron.Schedule

@@ -10,7 +10,7 @@
 			</ul>
 		</div>
 		<div class="uk-flex-right uk-text-right">
-			<a class="uk-button" href="/api/job.output/{{ .ViewModel.JobInvocation.JobName | urlencode }}/{{ .ViewModel.JobInvocation.ID }}" uk-icon="download" uk-tooltip="Download Job Output"></a>
+			<a class="uk-button" href="/api/job.output/{{ .ViewModel.JobName | urlencode }}/{{ .ViewModel.ID }}" uk-icon="download" uk-tooltip="Download Job Output"></a>
 		</div>
 	</div>
 	<div class="uk-grid uk-grid-match uk-grid-divider uk-grid-medium uk-child-width-1-4">
@@ -23,7 +23,7 @@
 			<span class="uk-text-warning" uk-icon="icon:warning; ratio:2" uk-tooltip="Invocation was cancelled"></span>
 			{{ else if.ViewModel.Status  | eq "errored" }}
 			<span class="uk-text-danger" uk-icon="icon:warning; ratio:2" uk-tooltip="Invocation failed"></span>
-			{{ else if .ViewModel.Status  | eq "complete" }}
+			{{ else if .ViewModel.Status  | eq "success" }}
 			<span class="uk-text-success" uk-icon="icon:check; ratio:2" uk-tooltip="Invocation complete"></span>
 			{{ else }}
 			<span class="uk-text-primary" uk-icon="icon:question; ratio:2" uk-tooltip="Invocation status unknown"></span>
@@ -32,16 +32,16 @@
 		</div>
 		<div>
 			<div class="uk-text-small"><span class="uk-icon uk-text-primary uk-margin-small-right" uk-icon="history"></span>Started</div>
-			<h4>{{ .ViewModel.JobInvocation.Started | rfc3339 }}</h4>
+			<h4>{{ .ViewModel.Started | rfc3339 }}</h4>
 		</div>
 		<div>
 			<div class="uk-text-small"><span class="uk-icon uk-text-primary uk-margin-small-right" uk-icon="history"></span>Finished</div>
-			<h4>{{ if .ViewModel.JobInvocation.Complete.IsZero }}-{{ else }}{{ .ViewModel.Complete | rfc3339 }}{{ end }}</h4>
+			<h4>{{ if .ViewModel.Complete.IsZero }}-{{ else }}{{ .ViewModel.Complete | rfc3339 }}{{ end }}</h4>
 		</div>
 		<div>
 			<div class="uk-text-small"><span class="uk-icon uk-text-primary uk-margin-small-right" uk-icon="clock"></span>Elapsed</div>
 			<h1 id="elapsed" class="uk-text-primary">
-			{{ if .ViewModel.Complete.IsZero }}{{ .ViewModel.Started | since_utc }}{{ else }}{{ .ViewModel.JobInvocation.Elapsed }}{{ end }}</div>
+			{{ if .ViewModel.Complete.IsZero }}{{ .ViewModel.Started | since_utc }}{{ else }}{{ .ViewModel.Elapsed }}{{ end }}</div>
 			</h1>
 		</div>
 		<hr/>
@@ -56,13 +56,13 @@
 		</div>
 		<hr/>
 		{{ end }}
-		{{ if .ViewModel.JobInvocation.Err }}
+		{{ if .ViewModel.Err }}
 		<div class="uk-grid uk-grid-divider uk-grid-medium uk-child-width-1-1">
 			<div>
 				<span class="uk-text-small">
 					Error
 				</span>
-				<pre>{{ .ViewModel.JobInvocation.Err }}</pre>
+				<pre>{{ .ViewModel.Err }}</pre>
 			</div>
 		</div>
 		<hr/>
@@ -92,7 +92,7 @@
 			{{ end }}
 			{{ if .ViewModel.JobInvocation.Status | eq "running" }}
 			<script>
-				var es = new EventSource("/api/job.output.stream/{{ .ViewModel.JobInvocation.JobName | urlencode }}/{{ .ViewModel.JobInvocation.ID }}?afterNanos={{ now_utc | unix_nano }}");
+				var es = new EventSource("/api/job.output.stream/{{ .ViewModel.JobName | urlencode }}/{{ .ViewModel.ID }}?afterNanos={{ now_utc | unix_nano }}");
 				es.addEventListener("writeln", (e) => {
 					termWrite(JSON.parse(e.data).data+"\n");
 				});

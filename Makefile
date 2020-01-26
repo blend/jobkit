@@ -52,7 +52,7 @@ cover:
 	@coverage -race
 
 run:
-	@go run cmd/job/main.go -c=_examples/notifications.yml --use-view-files=true
+	@go run cmd/job/main.go -c=_examples/jobs.yml --use-view-files=true
 
 upload:
 	@echo "THIS WOULD UPLOAD TO S3 BUT NOT TODAY"

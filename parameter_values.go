@@ -3,6 +3,7 @@ package jobkit
 import (
 	"encoding/json"
 	"net/url"
+	"sort"
 
 	"github.com/blend/go-sdk/cron"
 )
@@ -39,7 +40,14 @@ func ParameterValuesFromJSON(parameters []Parameter, data []byte) (cron.JobParam
 
 // ParameterValuesAsEnviron returns params as environment values, i.e. key=value.
 func ParameterValuesAsEnviron(params cron.JobParameters) (environ []string) {
-	for key, value := range params {
+	var keys []string
+	for key := range params {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	var value string
+	for _, key := range keys {
+		value = params[key]
 		environ = append(environ, key+"="+value)
 	}
 	return

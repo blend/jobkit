@@ -86,6 +86,7 @@ func (ji *JobInvocation) UnmarshalJSON(contents []byte) error {
 	if values.Error != "" {
 		ji.Err = errors.New(values.Error)
 	}
+	ji.Parameters = values.Parameters
 	ji.Output = new(bufferutil.Buffer)
 	if err := json.Unmarshal([]byte(values.Output), ji.JobInvocationOutput.Output); err != nil {
 		return ex.New(err)

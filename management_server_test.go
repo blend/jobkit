@@ -545,7 +545,7 @@ func TestManagementServerAPIJobInvocationOutputAfterNanosInvalid(t *testing.T) {
 		Chunks          []bufferutil.BufferChunk `json:"chunks"`
 	}
 	meta, err := web.MockGet(app,
-		fmt.Sprintf("/api/job.invocation.output/%s/%s", jobName, invocationID),
+		fmt.Sprintf("/api/job.output/%s/%s", jobName, invocationID),
 		r2.OptQueryValue("afterNanos", "baileydog"),
 	).JSON(&output)
 

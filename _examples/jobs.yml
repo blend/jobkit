@@ -11,7 +11,7 @@ jobs:
     labels:
       kind: "parameterized"
       team: "bailey"
-    schedule: "*/10 * * * *"
+    schedule: "*/10 * * * * *"
     historyEnabled: true
     historyPersistenceEnabled: false
     parameters:
@@ -32,3 +32,4 @@ jobs:
       - "echo"
       - "${MESSAGE}"
       - "${ENVIRONMENT}"
+      - "ran successfully!"

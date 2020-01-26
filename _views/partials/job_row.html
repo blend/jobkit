@@ -94,7 +94,7 @@
 		{{ end }}
 	</td>
 	<td> <!-- actions -->
-	{{ if .ViewModel.Config.Disabled }}
+	{{ if .ViewModel.Disabled }}
 		<a class="uk-button uk-button-default" href="/job.enable/{{ .ViewModel.Name | urlencode }}" uk-icon="future" uk-tooltip="Enable the job"></a>
 	{{else}}
 		<a class="uk-button uk-button-secondary" href="/job.disable/{{ .ViewModel.Name | urlencode }}" uk-icon="ban" uk-tooltip="Disable the job"></a>

@@ -5,7 +5,19 @@ import (
 	"html"
 	"html/template"
 	"strings"
+
+	"github.com/blend/go-sdk/cron"
 )
+
+// DefaultParameterValues pulls the default parameter values
+// off a set of jobkit parameters.
+func DefaultParameterValues(params ...Parameter) cron.JobParameters {
+	output := make(cron.JobParameters)
+	for _, param := range params {
+		output[param.Name] = param.Value
+	}
+	return output
+}
 
 // Parameter is an option for a job invocation.
 type Parameter struct {

@@ -16,9 +16,9 @@ type JobNotificationsConfig struct {
 	Webhook Webhook `yaml:"webhook"`
 
 	// MaxRetries is the maximum number of retries before we give up on a notification.
-	MaxRetries int `yaml:"maxRetries"`
+	MaxRetries *int `yaml:"maxRetries"`
 	// RetryWait is the time between attempts.
-	RetryWait time.Duration `yaml:"retryWait"`
+	RetryWait *time.Duration `yaml:"retryWait"`
 
 	// OnBegin governs if we should send notifications job start.
 	OnBegin *bool `yaml:"onBegin"`
@@ -38,6 +38,22 @@ type JobNotificationsConfig struct {
 	OnEnabled *bool `yaml:"onEnabled"`
 	// OnDisabled governs if we should send notifications when a job is disabled.
 	OnDisabled *bool `yaml:"onDisabled"`
+}
+
+// MaxRetriesOrDefault returns a value or a default.
+func (jnc JobNotificationsConfig) MaxRetriesOrDefault() int {
+	if jnc.MaxRetries != nil {
+		return *jnc.MaxRetries
+	}
+	return 32
+}
+
+// RetryWaitOrDefault returns a value or a default.
+func (jnc JobNotificationsConfig) RetryWaitOrDefault() time.Duration {
+	if jnc.RetryWait != nil {
+		return *jnc.RetryWait
+	}
+	return 5 * time.Second
 }
 
 // OnBeginOrDefault returns a value or a default.

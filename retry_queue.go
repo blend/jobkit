@@ -20,6 +20,9 @@ func NewRetryQueue(action async.WorkAction, options ...RetryQueueOption) *RetryQ
 		Action:      action,
 		Work:        make(chan *RetryQueueWorkItem, 32),
 		WaitHandles: make(map[string]*async.Latch),
+		RetryWaitProvider: func(_ *RetryQueueWorkItem) time.Duration {
+			return 5 * time.Second
+		},
 	}
 	for _, opt := range options {
 		opt(rq)
@@ -149,7 +152,7 @@ func (rq *RetryQueue) onError(wi *RetryQueueWorkItem, err error) {
 
 	// inrecement attempts
 	wi.Attempts = wi.Attempts + 1
-	if rq.MaxAttempts == 0 || wi.Attempts > rq.MaxAttempts {
+	if rq.MaxAttempts > 0 && wi.Attempts > rq.MaxAttempts {
 		return
 	}
 
@@ -163,9 +166,9 @@ func (rq *RetryQueue) onError(wi *RetryQueueWorkItem, err error) {
 
 	// requeue immediately
 	if rq.MaxAttempts > 0 {
-		logger.MaybeDebugf(rq.Log, "retry queue; work item error; immediately requeueing (%d of %d)", wi.Attempts, rq.MaxAttempts)
+		logger.MaybeDebugf(rq.Log, "retry queue; work item error; immediately requeueing (%d of %d attempts)", wi.Attempts, rq.MaxAttempts)
 	} else {
-		logger.MaybeDebugf(rq.Log, "retry queue; work item error; immediately requeueing (%d)", wi.Attempts)
+		logger.MaybeDebugf(rq.Log, "retry queue; work item error; immediately requeueing (%d attempts)", wi.Attempts)
 	}
 	rq.Work <- wi
 }

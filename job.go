@@ -76,6 +76,14 @@ func OptJobParsedSchedule(schedule string) JobOption {
 	}
 }
 
+// OptJobLog sets the job logger.
+func OptJobLog(log logger.Log) JobOption {
+	return func(job *Job) error {
+		job.Log = log
+		return nil
+	}
+}
+
 // JobOption is a function that mutates a job.
 type JobOption func(*Job) error
 
@@ -124,6 +132,8 @@ func (job *Job) Config() cron.JobConfig {
 	if typed, ok := job.Job.(cron.ConfigProvider); ok {
 		cfg = typed.Config()
 	}
+	// these will be ultimately merged with the invocation time parameter values.
+	cfg.ParameterValues = cron.MergeJobParameterValues(cfg.ParameterValues, DefaultParameterValues(job.JobConfig.Parameters...))
 	return cfg
 }
 
@@ -221,17 +231,22 @@ func (job *Job) OnLoad(ctx context.Context) error {
 		logger.MaybeErrorContext(ctx, job.Log, err)
 	}
 
-	job.NotificationsQueueEmail = NewRetryQueue(job.notifyEmail)
+	retryOptions := []RetryQueueOption{
+		OptRetryQueueMaxAttempts(job.JobConfig.Notifications.MaxRetriesOrDefault()),
+		OptRetryQueueRetryWait(job.JobConfig.Notifications.RetryWaitOrDefault()),
+	}
+
+	job.NotificationsQueueEmail = NewRetryQueue(job.notifyEmail, retryOptions...)
 	job.NotificationsQueueEmail.Log = job.Log
 	go job.NotificationsQueueEmail.Start()
 	<-job.NotificationsQueueEmail.NotifyStarted()
 
-	job.NotificationsQueueSlack = NewRetryQueue(job.notifySlack)
+	job.NotificationsQueueSlack = NewRetryQueue(job.notifySlack, retryOptions...)
 	job.NotificationsQueueSlack.Log = job.Log
 	go job.NotificationsQueueSlack.Start()
 	<-job.NotificationsQueueSlack.NotifyStarted()
 
-	job.NotificationsQueueWebhook = NewRetryQueue(job.notifyWebhook)
+	job.NotificationsQueueWebhook = NewRetryQueue(job.notifyWebhook, retryOptions...)
 	job.NotificationsQueueWebhook.Log = job.Log
 	go job.NotificationsQueueWebhook.Start()
 	<-job.NotificationsQueueWebhook.NotifyStarted()
@@ -488,7 +503,7 @@ func (job *Job) RestoreHistory(ctx context.Context) error {
 	job.Lock()
 	defer job.Unlock()
 
-	logger.MaybeDebugf(job.Log, "restoring history")
+	logger.MaybeDebugfContext(ctx, job.Log, "restoring history")
 	var err error
 	if job.History, err = job.HistoryProvider.RestoreHistory(ctx); err != nil {
 		return job.Error(ctx, err)
@@ -510,7 +525,7 @@ func (job *Job) PersistHistory(ctx context.Context) error {
 
 	job.Lock()
 	defer job.Unlock()
-	logger.MaybeDebugf(job.Log, "persisting history")
+	logger.MaybeDebugfContext(ctx, job.Log, "persisting history")
 
 	historyCopy := make([]*JobInvocation, len(job.History))
 	copy(historyCopy, job.History)
