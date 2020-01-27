@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/blend/go-sdk/cron"
 	"github.com/blend/go-sdk/ex"
@@ -105,7 +106,7 @@ func (los logOutputStream) Write(contents []byte) (count int, err error) {
 	if los.Log == nil {
 		return
 	}
-	los.Log.Trigger(los.Context, logger.NewMessageEvent(ShellActionLogFlag, string(contents)))
+	los.Log.Trigger(los.Context, logger.NewMessageEvent(ShellActionLogFlag, strings.TrimSpace(string(contents))))
 	count = len(contents)
 	return
 }

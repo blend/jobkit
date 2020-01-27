@@ -13,7 +13,6 @@ import (
 	"github.com/blend/go-sdk/assert"
 	"github.com/blend/go-sdk/bufferutil"
 	"github.com/blend/go-sdk/cron"
-	"github.com/blend/go-sdk/logger"
 	"github.com/blend/go-sdk/r2"
 	"github.com/blend/go-sdk/uuid"
 	"github.com/blend/go-sdk/web"
@@ -213,16 +212,15 @@ func TestManagementServerJobRun(t *testing.T) {
 	assert := assert.New(t)
 
 	jm, app := createTestManagementServer()
-	app.Log = logger.All()
 
 	job, err := jm.Job("test1")
 	assert.Nil(err)
 	assert.NotNil(job)
 	jobName := job.Name()
 
-	meta, err := web.MockGet(app, fmt.Sprintf("/job.run/%s", jobName)).Discard()
+	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job.run/%s", jobName)).Bytes()
 	assert.Nil(err)
-	assert.Equal(http.StatusTemporaryRedirect, meta.StatusCode)
+	assert.Equal(http.StatusOK, meta.StatusCode, string(contents))
 	assert.NotNil(job.Last)
 }
 

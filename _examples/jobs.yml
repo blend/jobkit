@@ -11,7 +11,7 @@ jobs:
     labels:
       kind: "parameterized"
       team: "bailey"
-    schedule: "*/10 * * * * *"
+    schedule: "*/30 * * * * *"
     historyEnabled: true
     historyPersistenceEnabled: false
     parameters:

@@ -278,29 +278,27 @@ func run(cmd *cobra.Command, args []string) error {
 		job.StatsClient = statsClient
 		job.SentryClient = sentryClient
 
-		enabled := ansi.ColorGreen.Apply("enabled")
-		disabled := ansi.ColorRed.Apply("disabled")
 		log.Infof("loading job `%s` with exec: %s", jobCfg.Name, ansi.ColorLightWhite.Apply(strings.Join(jobCfg.Exec, " ")))
 		log.Infof("loading job `%s` with schedule: %s", jobCfg.Name, ansi.ColorLightWhite.Apply(jobCfg.ScheduleOrDefault()))
 		if !jobCfg.HistoryDisabledOrDefault() && !jobCfg.HistoryPersistenceDisabledOrDefault() {
-			log.Infof("loading job `%s` with history: %v and persistence: %v to output path: %s", jobCfg.Name, enabled, enabled, ansi.ColorLightWhite.Apply(jobCfg.HistoryPathOrDefault()))
+			log.Infof("loading job `%s` with history: enabled and persistence: enabled to output path: %s", jobCfg.Name, jobCfg.HistoryPathOrDefault())
 		} else if !jobCfg.HistoryDisabledOrDefault() {
-			log.Infof("loading job `%s` with history: %v and persistence: %v", jobCfg.Name, enabled, disabled)
+			log.Infof("loading job `%s` with history: enabled and persistence: disabled", jobCfg.Name)
 		} else {
-			log.Infof("loading job `%s` with history: %v", jobCfg.Name, disabled)
+			log.Infof("loading job `%s` with history: disabled", jobCfg.Name)
 		}
 		if !jobCfg.HistoryDisabledOrDefault() {
 			if jobCfg.HistoryMaxCountOrDefault() > 0 {
 				maxCount := ansi.ColorLightWhite.Apply(fmt.Sprint(jobCfg.HistoryMaxCountOrDefault()))
 				log.Infof("loading job `%s` with history max count: %s", jobCfg.Name, maxCount)
 			} else {
-				log.Infof("loading job `%s` with history max count: %s", jobCfg.Name, disabled)
+				log.Infof("loading job `%s` with history max count: disabled", jobCfg.Name)
 			}
 			if jobCfg.HistoryMaxAgeOrDefault() > 0 {
-				maxAge := ansi.ColorLightWhite.Apply(fmt.Sprint(jobCfg.HistoryMaxAgeOrDefault()))
+				maxAge := fmt.Sprint(jobCfg.HistoryMaxAgeOrDefault())
 				log.Infof("loading job `%s` with history max age: %s", jobCfg.Name, maxAge)
 			} else {
-				log.Infof("loading job `%s` with history max age: %s", jobCfg.Name, disabled)
+				log.Infof("loading job `%s` with history max age: disabled", jobCfg.Name)
 			}
 		}
 		if err = jobs.LoadJobs(job); err != nil {
