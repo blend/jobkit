@@ -1,6 +1,7 @@
 package jobkit
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"testing"
@@ -44,25 +45,32 @@ func createTestBufferChunk(index int) bufferutil.BufferChunk {
 
 func createTestCompleteJobInvocation(jobName string, elapsed time.Duration) *JobInvocation {
 	ts := time.Now().UTC()
-	return &JobInvocation{
-		JobInvocation: &cron.JobInvocation{
-			ID:       uuid.V4().String(),
-			JobName:  jobName,
-			Started:  ts,
-			Complete: ts.Add(elapsed),
-			Status:   cron.JobInvocationStatusSuccess,
-		},
-		JobInvocationOutput: JobInvocationOutput{
-			Output: &bufferutil.Buffer{
-				Chunks: []bufferutil.BufferChunk{
-					createTestBufferChunk(0),
-					createTestBufferChunk(1),
-					createTestBufferChunk(2),
-					createTestBufferChunk(3),
-					createTestBufferChunk(4),
-				},
+	output := &JobInvocationOutput{
+		Output: &bufferutil.Buffer{
+			Chunks: []bufferutil.BufferChunk{
+				createTestBufferChunk(0),
+				createTestBufferChunk(1),
+				createTestBufferChunk(2),
+				createTestBufferChunk(3),
+				createTestBufferChunk(4),
 			},
 		},
+	}
+
+	ji := &cron.JobInvocation{
+		ID:       uuid.V4().String(),
+		JobName:  jobName,
+		Started:  ts,
+		Complete: ts.Add(elapsed),
+		Status:   cron.JobInvocationStatusSuccess,
+		State:    output,
+	}
+	ji.Context = cron.WithJobInvocation(context.Background(), ji)
+	ji.Context = WithJobInvocationOutput(ji.Context, output)
+
+	return &JobInvocation{
+		JobInvocation:       ji,
+		JobInvocationOutput: *output,
 	}
 }
 
@@ -89,65 +97,43 @@ func createTestFailedJobInvocation(jobName string, elapsed time.Duration, err er
 }
 
 func createTestJobManager() *cron.JobManager {
-	test0 := cron.NewJob(cron.OptJobName("test0"))
-	test1 := cron.NewJob(cron.OptJobName("test1"))
-	test2 := cron.NewJob(cron.OptJobName("test2 job.foo"))
+	test0inner := cron.NewJob(cron.OptJobName("test0"))
+	test1inner := cron.NewJob(cron.OptJobName("test1"))
+	test2inner := cron.NewJob(cron.OptJobName("test2 job.foo"))
 
-	jm := cron.New()
-	jm.LoadJobs(
-		MustNewJob(test0),
-		MustNewJob(test1),
-		MustNewJob(test2),
-	)
+	test0 := MustNewJob(test0inner)
+	test1 := MustNewJob(test1inner)
+	test2 := MustNewJob(test2inner)
 
-	test0CurrentOutput := &bufferutil.Buffer{
-		Chunks: []bufferutil.BufferChunk{
-			createTestBufferChunk(0),
-			createTestBufferChunk(1),
-			createTestBufferChunk(2),
-			createTestBufferChunk(3),
-		},
-	}
-	test0CurrentBufferHandlers := new(bufferutil.BufferHandlers)
-	test0CurrentOutput.Handler = test0CurrentBufferHandlers.Handle
-
-	jm.Jobs["test0"].Current = &cron.JobInvocation{
-		ID:      uuid.V4().String(),
-		JobName: "test0",
-		Started: time.Now().UTC(),
-		State: JobInvocationOutput{
-			Output:         test0CurrentOutput,
-			OutputHandlers: test0CurrentBufferHandlers,
-		},
-	}
-
-	jm.Jobs["test0"].Job.(*Job).appendResultsUnsafe(
+	test0.appendResultsUnsafe(
 		createTestCompleteJobInvocation("test0", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test0", 250*time.Millisecond),
 		createTestFailedJobInvocation("test0", 5*time.Second, fmt.Errorf("this is only a test %s", uuid.V4().String())),
 	)
-	jm.Jobs["test1"].Job.(*Job).appendResultsUnsafe(
+
+	test1.appendResultsUnsafe(
 		createTestCompleteJobInvocation("test1", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test1", 250*time.Millisecond),
 		createTestCompleteJobInvocation("test1", 300*time.Millisecond),
 		createTestCompleteJobInvocation("test1", 350*time.Millisecond),
 	)
-	jm.Jobs["test2 job.foo"].Job.(*Job).appendResultsUnsafe(
+
+	test2.appendResultsUnsafe(
 		createTestCompleteJobInvocation("test2 job.foo", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test2 job.foo", 250*time.Millisecond),
 		createTestCompleteJobInvocation("test2 job.foo", 300*time.Millisecond),
 		createTestCompleteJobInvocation("test2 job.foo", 350*time.Millisecond),
 	)
+
+	jm := cron.New()
+	jm.LoadJobs(test0, test1, test2)
+	jm.Jobs["test0"].Current = createTestCompleteJobInvocation("test0", 200*time.Millisecond).JobInvocation
 	return jm
 }
 
 func createTestManagementServer() (*cron.JobManager, *web.App) {
 	jm := createTestJobManager()
-	return jm, NewServer(jm, Config{
-		Web: web.Config{
-			Port: 5000,
-		},
-	})
+	return jm, NewServer(jm, Config{})
 }
 
 func TestMain(m *testing.M) {

@@ -38,10 +38,9 @@ func MustNewJob(wrapped cron.Job, options ...JobOption) *Job {
 // NewJob returns a new job.
 func NewJob(wrapped cron.Job, options ...JobOption) (*Job, error) {
 	job := &Job{
-		Job:           wrapped,
-		HistoryLookup: make(map[string]*JobInvocation),
+		Job: wrapped,
 	}
-	if typed, ok := job.Job.(cron.ScheduleProvider); ok {
+	if typed, ok := wrapped.(cron.ScheduleProvider); ok {
 		job.JobSchedule = typed.Schedule()
 	}
 	var err error
@@ -49,9 +48,6 @@ func NewJob(wrapped cron.Job, options ...JobOption) (*Job, error) {
 		if err = opt(job); err != nil {
 			return nil, err
 		}
-	}
-	if job.HistoryProvider == nil {
-		job.HistoryProvider = HistoryJSON{Config: job.JobConfig}
 	}
 	return job, nil
 }
@@ -566,13 +562,14 @@ func (job *Job) AddHistoryResult(ji *JobInvocation) error {
 
 // appendResultsUnsafe appends invocation results.
 // It assumes the job history lock is acquired.
+// It's structured to take a variadic number of invocations to make
+// writing tests easier.
 func (job *Job) appendResultsUnsafe(invocations ...*JobInvocation) {
-	job.History = append(job.History, invocations...)
-
 	if job.HistoryLookup == nil {
 		job.HistoryLookup = make(map[string]*JobInvocation)
 	}
 	for _, ji := range invocations {
+		job.History = append(job.History, ji)
 		job.HistoryLookup[ji.ID] = ji
 	}
 }

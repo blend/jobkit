@@ -105,7 +105,7 @@ func (ms ManagementServer) Register(app *web.App) {
 	app.POST("/api/pause", ms.postAPIPause)
 	app.POST("/api/resume", ms.postAPIResume)
 	app.GET("/api/jobs", ms.getAPIJobs)
-	app.GET("/api/jobs/running", ms.getAPIJobsRunning)
+	app.GET("/api/jobs.running", ms.getAPIJobsRunning)
 	app.GET("/api/job/:jobName", ms.getAPIJob)
 	app.GET("/api/job.parameters/:jobName", ms.getAPIJobParameters)
 	app.POST("/api/job.run/:jobName", ms.postAPIJobRun)
@@ -113,8 +113,8 @@ func (ms ManagementServer) Register(app *web.App) {
 	app.POST("/api/job.disable/:jobName", ms.postAPIJobDisable)
 	app.POST("/api/job.enable/:jobName", ms.postAPIJobEnable)
 	app.GET("/api/job/:jobName/:id", ms.getAPIJobInvocation)
-	app.GET("/api/job.output/:jobName/:id", ms.getAPIJobInvocationOutput)
-	app.GET("/api/job.output.stream/:jobName/:id", ms.getAPIJobInvocationOutputStream)
+	app.GET("/api/job.output/:jobName/:id", ms.getAPIJobOutput)
+	app.GET("/api/job.output.stream/:jobName/:id", ms.getAPIJobOutputStream)
 
 	// debug things
 	app.GET("/api/debug/error", func(r *web.Ctx) web.Result {
@@ -301,7 +301,7 @@ func (ms ManagementServer) getJobCancel(r *web.Ctx) web.Result {
 	return web.RedirectWithMethod("GET", "/")
 }
 
-// getJobInvocation is mapped to GET /job.invocation/:jobName/:id
+// getJobInvocation is mapped to GET /job/:jobName/:id
 func (ms ManagementServer) getJobInvocation(r *web.Ctx) web.Result {
 	invocation, result := ms.getRequestJobInvocation(r, r.Views)
 	if result != nil {
@@ -435,7 +435,8 @@ func (ms ManagementServer) getAPIJobInvocation(r *web.Ctx) web.Result {
 	return web.JSON.Result(invocation)
 }
 
-func (ms ManagementServer) getAPIJobInvocationOutput(r *web.Ctx) web.Result {
+// getAPIJobOutput is mapped to GET /api/job.output/:jobName/:id
+func (ms ManagementServer) getAPIJobOutput(r *web.Ctx) web.Result {
 	invocation, result := ms.getRequestJobInvocation(r, web.JSON)
 	if result != nil {
 		return result
@@ -461,7 +462,8 @@ func (ms ManagementServer) getAPIJobInvocationOutput(r *web.Ctx) web.Result {
 	})
 }
 
-func (ms ManagementServer) getAPIJobInvocationOutputStream(r *web.Ctx) web.Result {
+// getAPIJobOutput is mapped to GET /api/job.output.stream/:jobName/:id
+func (ms ManagementServer) getAPIJobOutputStream(r *web.Ctx) web.Result {
 	invocation, result := ms.getRequestJobInvocation(r, web.JSON)
 	if result != nil {
 		return result
@@ -558,6 +560,7 @@ func (ms ManagementServer) getRequestJob(r *web.Ctx, resultProvider web.ResultPr
 	}
 	jobScheduler, err := ms.Cron.Job(jobName)
 	if err != nil || jobScheduler == nil {
+		println("job not found", jobName)
 		return nil, resultProvider.NotFound()
 	}
 	jvm, err := NewJobViewModel(jobScheduler)
@@ -579,10 +582,12 @@ func (ms ManagementServer) getRequestJobInvocation(r *web.Ctx, resultProvider we
 		return nil, resultProvider.BadRequest(err)
 	}
 
-	if invocationID == "current" && job.Current != nil {
+	if (invocationID == "current" && job.Current != nil) ||
+		(job.Current != nil && job.Current.ID == invocationID) {
 		return job.Current, nil
 	}
-	if invocationID == "last" && job.Last != nil {
+	if (invocationID == "last" && job.Last != nil) ||
+		(job.Last != nil && job.Last.ID == invocationID) {
 		return job.Last, nil
 	}
 

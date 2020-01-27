@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"testing"
 	"time"
@@ -315,7 +314,7 @@ func TestManagementServerAPIJobsRunning(t *testing.T) {
 	assert := assert.New(t)
 
 	_, app := createTestManagementServer()
-	var jobs map[string]cron.JobInvocation
+	var jobs []JobInvocation
 	meta, err := web.MockGet(app, "/api/jobs.running").JSON(&jobs)
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode)
@@ -363,7 +362,7 @@ func TestManagementServerAPIJob(t *testing.T) {
 	meta, err := web.MockGet(app, fmt.Sprintf("/api/job/%s", jobName)).JSON(&jvm)
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode)
-	assert.Equal(jobName, job.Name)
+	assert.Equal(jobName, job.Name())
 }
 
 func TestManagementServerAPIJobNotFound(t *testing.T) {
@@ -402,12 +401,15 @@ func TestManagementServerAPIJobCancel(t *testing.T) {
 	called := make(chan struct{})
 	cancelled := make(chan struct{})
 
-	job := cron.NewJob(cron.OptJobName("cancel-test"), cron.OptJobAction(func(ctx context.Context) error {
-		close(called)
-		<-ctx.Done()
-		close(cancelled)
-		return nil
-	}))
+	job := cron.NewJob(
+		cron.OptJobName("cancel-test"),
+		cron.OptJobAction(func(ctx context.Context) error {
+			close(called)
+			<-ctx.Done()
+			close(cancelled)
+			return nil
+		}),
+	)
 	jm.LoadJobs(job)
 
 	meta, err := web.MockPost(app, fmt.Sprintf("/api/job.run/%s", job.Name()), nil).Discard()
@@ -477,7 +479,7 @@ func TestManagementServerAPIJobInvocation(t *testing.T) {
 	assert.Equal(invocationID, ji.ID)
 }
 
-func TestManagementServerAPIJobInvocationOutput(t *testing.T) {
+func TestManagementServerAPIJobOutput(t *testing.T) {
 	assert := assert.New(t)
 
 	jm, app := createTestManagementServer()
@@ -499,7 +501,7 @@ func TestManagementServerAPIJobInvocationOutput(t *testing.T) {
 	assert.Len(output.Chunks, 5)
 }
 
-func TestManagementServerAPIJobInvocationOutputAfterNanos(t *testing.T) {
+func TestManagementServerAPIJobOutputAfterNanos(t *testing.T) {
 	assert := assert.New(t)
 
 	jm, app := createTestManagementServer()
@@ -527,7 +529,7 @@ func TestManagementServerAPIJobInvocationOutputAfterNanos(t *testing.T) {
 	assert.Len(output.Chunks, 2)
 }
 
-func TestManagementServerAPIJobInvocationOutputAfterNanosInvalid(t *testing.T) {
+func TestManagementServerAPIJobOutputAfterNanosInvalid(t *testing.T) {
 	assert := assert.New(t)
 
 	jm, app := createTestManagementServer()
@@ -553,33 +555,33 @@ func TestManagementServerAPIJobInvocationOutputAfterNanosInvalid(t *testing.T) {
 	assert.Len(output.Chunks, 5)
 }
 
-func TestManagementServerAPIJobInvocationOutputStreamComplete(t *testing.T) {
+func TestManagementServerAPIJobOutputStreamComplete(t *testing.T) {
 	assert := assert.New(t)
 
 	jm, app := createTestManagementServer()
 
-	job, err := jm.Job("test1")
+	jobScheduler, err := jm.Job("test1")
 	assert.Nil(err)
-	assert.NotNil(job)
+	assert.NotNil(jobScheduler)
 
-	jobName := job.Name()
-	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
+	jobName := jobScheduler.Name()
+	job, ok := jobScheduler.Job.(*Job)
+	assert.True(ok)
 
-	res, err := web.MockGet(app,
+	invocationID := job.History[0].ID
+	contents, res, err := web.MockGet(app,
 		fmt.Sprintf("/api/job.output.stream/%s/%s", jobName, invocationID),
 		r2.OptQueryValue("afterNanos", "baileydog"),
-	).Do()
+	).Bytes()
 
 	assert.Nil(err)
 	defer res.Body.Close()
 
-	assert.Equal(http.StatusOK, res.StatusCode)
-	contents, err := ioutil.ReadAll(res.Body)
-	assert.Nil(err)
-	assert.Equal("event: ping\n\nevent: complete\ndata: complete\n\n", string(contents))
+	assert.Equal(http.StatusOK, res.StatusCode, string(contents))
+	assert.Equal("event: ping\n\nevent: complete\ndata: success\n\n", string(contents))
 }
 
-func TestManagementServerAPIJobInvocationOutputStream(t *testing.T) {
+func TestManagementServerAPIJobOutputStream(t *testing.T) {
 	assert := assert.New(t)
 
 	jm, app := createTestManagementServer()
