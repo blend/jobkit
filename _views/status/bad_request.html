@@ -1,0 +1,9 @@
+{{ define "bad_request" }}
+{{ template "header" . }}
+<div id="content" class="uk-container uk-container-expand">
+	<h1>Bad Request</h1>
+	<a href="/">Return Home</a>
+	<pre>{{ .ViewModel }}</pre>
+</div>
+{{ template "footer" . }}
+{{ end }}

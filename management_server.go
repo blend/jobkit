@@ -133,6 +133,9 @@ func (ms ManagementServer) ViewPaths() []string {
 		"_views/parameters.html",
 		"_views/partials/job_table.html",
 		"_views/partials/job_row.html",
+		"_views/status/error.html",
+		"_views/status/not_found.html",
+		"_views/status/bad_request.html",
 	}
 }
 
@@ -560,7 +563,6 @@ func (ms ManagementServer) getRequestJob(r *web.Ctx, resultProvider web.ResultPr
 	}
 	jobScheduler, err := ms.Cron.Job(jobName)
 	if err != nil || jobScheduler == nil {
-		println("job not found", jobName)
 		return nil, resultProvider.NotFound()
 	}
 	jvm, err := NewJobViewModel(jobScheduler)

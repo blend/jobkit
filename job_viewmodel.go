@@ -1,6 +1,7 @@
 package jobkit
 
 import (
+	"context"
 	"sort"
 	"time"
 
@@ -42,18 +43,34 @@ func NewJobViewModel(js *cron.JobScheduler) (*JobViewModel, error) {
 	if !ok {
 		return nil, ex.New("invalid job type; must be a *jobkit.Job")
 	}
+
+	var history []*JobInvocation
+	var historyLookup map[string]*JobInvocation
+	if typed.HistoryProvider != nil {
+		var err error
+		history, err = typed.HistoryProvider.Get(context.Background())
+		if err != nil {
+			return nil, err
+		}
+
+		historyLookup = make(map[string]*JobInvocation)
+		for _, ji := range history {
+			historyLookup[ji.ID] = ji
+		}
+	}
+
 	return &JobViewModel{
 		Name:          typed.Name(),
 		Labels:        js.Labels(),
 		Disabled:      js.Disabled(),
 		Config:        typed.JobConfig,
-		Stats:         typed.Stats(),
+		Stats:         HistoryStats(history),
 		Schedule:      typed.JobSchedule,
 		NextRuntime:   js.NextRuntime,
 		Current:       NewJobInvocation(js.Current),
 		Last:          NewJobInvocation(js.Last),
-		History:       typed.History,
-		HistoryLookup: typed.HistoryLookup,
+		History:       history,
+		HistoryLookup: historyLookup,
 	}, nil
 }
 

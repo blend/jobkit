@@ -3,14 +3,11 @@ package jobkit
 import (
 	"context"
 	"fmt"
-	"sync"
-	"time"
 
 	"github.com/blend/go-sdk/cron"
 	"github.com/blend/go-sdk/email"
 	"github.com/blend/go-sdk/ex"
 	"github.com/blend/go-sdk/logger"
-	"github.com/blend/go-sdk/mathutil"
 	"github.com/blend/go-sdk/r2"
 	"github.com/blend/go-sdk/sentry"
 	"github.com/blend/go-sdk/slack"
@@ -80,13 +77,19 @@ func OptJobLog(log logger.Log) JobOption {
 	}
 }
 
+// OptJobHistory sets the job history provider.
+func OptJobHistory(provider HistoryProvider) JobOption {
+	return func(job *Job) error {
+		job.HistoryProvider = provider
+		return nil
+	}
+}
+
 // JobOption is a function that mutates a job.
 type JobOption func(*Job) error
 
 // Job is the main job body.
 type Job struct {
-	sync.Mutex
-
 	Job         cron.Job
 	JobConfig   JobConfig
 	JobSchedule cron.Schedule
@@ -105,9 +108,6 @@ type Job struct {
 	NotificationsQueueEmail   *RetryQueue
 	NotificationsQueueSlack   *RetryQueue
 	NotificationsQueueWebhook *RetryQueue
-
-	History       []*JobInvocation
-	HistoryLookup map[string]*JobInvocation
 
 	HistoryProvider HistoryProvider
 }
@@ -223,10 +223,6 @@ func (job *Job) Lifecycle() (output cron.JobLifecycle) {
 
 // OnLoad implements job on load handler.
 func (job *Job) OnLoad(ctx context.Context) error {
-	if err := job.RestoreHistory(ctx); err != nil {
-		logger.MaybeErrorContext(ctx, job.Log, err)
-	}
-
 	retryOptions := []RetryQueueOption{
 		OptRetryQueueMaxAttempts(job.JobConfig.Notifications.MaxRetriesOrDefault()),
 		OptRetryQueueRetryWait(job.JobConfig.Notifications.RetryWaitOrDefault()),
@@ -252,10 +248,6 @@ func (job *Job) OnLoad(ctx context.Context) error {
 
 // OnUnload implements job on unload handler.
 func (job *Job) OnUnload(ctx context.Context) error {
-	if err := job.PersistHistory(ctx); err != nil {
-		logger.MaybeErrorContext(ctx, job.Log, err)
-	}
-
 	if job.NotificationsQueueEmail != nil {
 		job.NotificationsQueueEmail.Stop()
 	}
@@ -286,12 +278,9 @@ func (job *Job) OnSuccess(ctx context.Context) {
 
 // OnComplete is a lifecycle event handler.
 func (job *Job) OnComplete(ctx context.Context) {
-	// NOTE: because `OnComplete` happens for _every_ invocation
-	// we manage history here.
-
-	job.AddHistoryResult(NewJobInvocation(cron.GetJobInvocation(ctx)))
-	job.PersistHistory(ctx)
-
+	if err := job.AddHistoryResult(NewJobInvocation(cron.GetJobInvocation(ctx))); err != nil {
+		job.Error(ctx, err)
+	}
 	job.sendStats(ctx, cron.FlagComplete)
 	if job.JobConfig.Notifications.OnCompleteOrDefault() {
 		job.notify(ctx, cron.FlagComplete)
@@ -344,17 +333,6 @@ func (job *Job) OnDisabled(ctx context.Context) {
 	if job.JobConfig.Notifications.OnDisabledOrDefault() {
 		job.notify(ctx, cron.FlagDisabled)
 	}
-}
-
-// GetJobInvocationByID returns a job invocation by id.
-func (job *Job) GetJobInvocationByID(invocationID string) *JobInvocation {
-	job.Lock()
-	defer job.Unlock()
-
-	if ji, ok := job.HistoryLookup[invocationID]; ok {
-		return ji
-	}
-	return nil
 }
 
 // Execute is the job body.
@@ -488,153 +466,12 @@ func (job *Job) notify(ctx context.Context, flag string) {
 // history utils
 //
 
-// RestoreHistory calls the persist handler if it's set.
-func (job *Job) RestoreHistory(ctx context.Context) error {
-	if job.JobConfig.HistoryDisabledOrDefault() {
-		logger.MaybeDebugfContext(ctx, job.Log, "restoring history: history disabled")
-		return nil
-	}
-	if job.JobConfig.HistoryPersistenceDisabledOrDefault() {
-		logger.MaybeDebugfContext(ctx, job.Log, "restoring history: history persistence disabled")
-		return nil
-	}
-	if job.HistoryProvider == nil {
-		logger.MaybeDebugfContext(ctx, job.Log, "restoring history: history provider unset")
-		return nil
-	}
-
-	job.Lock()
-	defer job.Unlock()
-
-	logger.MaybeDebugfContext(ctx, job.Log, "restoring history")
-
-	var err error
-	if job.History, err = job.HistoryProvider.RestoreHistory(ctx); err != nil {
-		return job.Error(ctx, err)
-	}
-	return nil
-}
-
-// PersistHistory calls the persist handler if it's set.
-func (job *Job) PersistHistory(ctx context.Context) error {
-	if job.JobConfig.HistoryDisabledOrDefault() {
-		logger.MaybeDebugfContext(ctx, job.Log, "persisting history: history disabled")
-		return nil
-	}
-	if job.JobConfig.HistoryPersistenceDisabledOrDefault() {
-		logger.MaybeDebugfContext(ctx, job.Log, "persisting history: history persistence disabled")
-		return nil
-	}
-	if job.HistoryProvider == nil {
-		logger.MaybeDebugfContext(ctx, job.Log, "persisting history: history provider unset")
-		return nil
-	}
-
-	job.Lock()
-	defer job.Unlock()
-
-	logger.MaybeDebugfContext(ctx, job.Log, "persisting history")
-
-	historyCopy := make([]*JobInvocation, len(job.History))
-	copy(historyCopy, job.History)
-	if err := job.HistoryProvider.PersistHistory(ctx, historyCopy); err != nil {
-		return job.Error(ctx, err)
-	}
-	return nil
-}
-
 // AddHistoryResult adds an item to history and culls old items.
 func (job *Job) AddHistoryResult(ji *JobInvocation) error {
-	if ji == nil {
-		return ex.New("history result is unset, cannot continue")
+	if job.JobConfig.HistoryDisabledOrDefault() ||
+		job.JobConfig.HistoryPersistenceDisabledOrDefault() ||
+		job.HistoryProvider == nil {
+		return nil
 	}
-	if ji.Complete.IsZero() {
-		logger.MaybeWarningfContext(ji.Context, job.Log, "AddHistoryResult: history result has an unset complete time")
-	}
-
-	job.Lock()
-	defer job.Unlock()
-
-	job.appendResultsUnsafe(ji)
-	job.cullResultsUnsafe()
-	return nil
-}
-
-// appendResultsUnsafe appends invocation results.
-// It assumes the job history lock is acquired.
-// It's structured to take a variadic number of invocations to make
-// writing tests easier.
-func (job *Job) appendResultsUnsafe(invocations ...*JobInvocation) {
-	if job.HistoryLookup == nil {
-		job.HistoryLookup = make(map[string]*JobInvocation)
-	}
-	for _, ji := range invocations {
-		job.History = append(job.History, ji)
-		job.HistoryLookup[ji.ID] = ji
-	}
-}
-
-// cullResultsUnsafe cullts expired results.
-// It assumes the job history lock is acquired.
-func (job *Job) cullResultsUnsafe() {
-	count := len(job.History)
-	maxCount := job.JobConfig.HistoryMaxCountOrDefault()
-	maxAge := job.JobConfig.HistoryMaxAgeOrDefault()
-
-	now := time.Now().UTC()
-	var filtered []*JobInvocation
-	var removed []string
-	for index, h := range job.History {
-		if maxCount > 0 {
-			if index < (count - maxCount) {
-				removed = append(removed, h.JobInvocation.ID)
-				continue
-			}
-		}
-		if maxAge > 0 {
-			if now.Sub(h.JobInvocation.Started) > maxAge {
-				continue
-			}
-		}
-		filtered = append(filtered, h)
-	}
-
-	for _, id := range removed {
-		delete(job.HistoryLookup, id)
-	}
-	job.History = filtered
-}
-
-// Stats returns job stats.
-func (job *Job) Stats() JobStats {
-	output := JobStats{
-		Name:      job.Name(),
-		RunsTotal: len(job.History),
-	}
-
-	var elapsedTimes []time.Duration
-	for _, ji := range job.History {
-		switch ji.Status {
-		case cron.JobInvocationStatusSuccess:
-			output.RunsSuccessful++
-		case cron.JobInvocationStatusErrored:
-			output.RunsErrored++
-		case cron.JobInvocationStatusCancelled:
-			output.RunsCancelled++
-		}
-
-		elapsedTimes = append(elapsedTimes, ji.JobInvocation.Elapsed())
-		if ji.JobInvocation.Elapsed() > output.ElapsedMax {
-			output.ElapsedMax = ji.JobInvocation.Elapsed()
-		}
-		if ji.JobInvocationOutput.Output != nil {
-			output.OutputBytes += len(ji.JobInvocationOutput.Output.Bytes())
-		}
-	}
-	if output.RunsTotal > 0 {
-		output.SuccessRate = float64(output.RunsSuccessful) / float64(output.RunsTotal)
-	}
-	output.Elapsed50th = mathutil.PercentileOfDuration(elapsedTimes, 50.0)
-	output.Elapsed95th = mathutil.PercentileOfDuration(elapsedTimes, 95.0)
-	return output
+	return job.HistoryProvider.Add(ji.Context, ji)
 }

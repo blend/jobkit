@@ -101,29 +101,32 @@ func createTestJobManager() *cron.JobManager {
 	test1inner := cron.NewJob(cron.OptJobName("test1"))
 	test2inner := cron.NewJob(cron.OptJobName("test2 job.foo"))
 
-	test0 := MustNewJob(test0inner)
-	test1 := MustNewJob(test1inner)
-	test2 := MustNewJob(test2inner)
-
-	test0.appendResultsUnsafe(
+	test0History := &HistoryMemory{}
+	test0History.AddMany(context.TODO(),
 		createTestCompleteJobInvocation("test0", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test0", 250*time.Millisecond),
 		createTestFailedJobInvocation("test0", 5*time.Second, fmt.Errorf("this is only a test %s", uuid.V4().String())),
 	)
 
-	test1.appendResultsUnsafe(
+	test1History := &HistoryMemory{}
+	test1History.AddMany(context.TODO(),
 		createTestCompleteJobInvocation("test1", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test1", 250*time.Millisecond),
 		createTestCompleteJobInvocation("test1", 300*time.Millisecond),
 		createTestCompleteJobInvocation("test1", 350*time.Millisecond),
 	)
 
-	test2.appendResultsUnsafe(
+	test2History := &HistoryMemory{}
+	test2History.AddMany(context.TODO(),
 		createTestCompleteJobInvocation("test2 job.foo", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test2 job.foo", 250*time.Millisecond),
 		createTestCompleteJobInvocation("test2 job.foo", 300*time.Millisecond),
 		createTestCompleteJobInvocation("test2 job.foo", 350*time.Millisecond),
 	)
+
+	test0 := MustNewJob(test0inner, OptJobHistory(test0History))
+	test1 := MustNewJob(test1inner, OptJobHistory(test1History))
+	test2 := MustNewJob(test2inner, OptJobHistory(test2History))
 
 	jm := cron.New()
 	jm.LoadJobs(test0, test1, test2)

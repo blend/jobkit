@@ -3,17 +3,14 @@ package jobkit
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/blend/go-sdk/email"
-
 	"github.com/blend/go-sdk/assert"
 	"github.com/blend/go-sdk/cron"
+	"github.com/blend/go-sdk/email"
 	"github.com/blend/go-sdk/ref"
 	"github.com/blend/go-sdk/slack"
 	"github.com/blend/go-sdk/uuid"
@@ -272,35 +269,4 @@ func TestJobLifecycleHooksWebhookNotifications(t *testing.T) {
 	job.OnFixed(ctx)
 
 	assert.Len(webhooks, 6)
-}
-
-func TestJobHistoryProvider(t *testing.T) {
-	assert := assert.New(t)
-
-	tmpdir, err := ioutil.TempDir("", "gosdk_jobkit")
-	assert.Nil(err)
-	defer os.RemoveAll(tmpdir)
-
-	cfg := JobConfig{
-		Name:        "gosdk_jobkit",
-		JobConfig:   cron.JobConfig{},
-		HistoryPath: tmpdir,
-	}
-	job := &Job{
-		JobConfig:       cfg,
-		HistoryProvider: HistoryJSON{Config: cfg},
-	}
-
-	job.History = []*JobInvocation{
-		createTestCompleteJobInvocation("test0", 100*time.Millisecond),
-		createTestCompleteJobInvocation("test0", 200*time.Millisecond),
-		createTestFailedJobInvocation("test0", 100*time.Millisecond, fmt.Errorf("this is only a test")),
-	}
-
-	err = job.PersistHistory(context.Background())
-	assert.Nil(err)
-
-	err = job.RestoreHistory(context.Background())
-	assert.Nil(err)
-	assert.Len(job.History, 3)
 }

@@ -29,7 +29,7 @@ jobs:
           - value: "production"
             text: "Production"
     exec:
-      - "echo"
+      - "sh"
+      - "_examples/long.sh"
       - "${MESSAGE}"
       - "${ENVIRONMENT}"
-      - "ran successfully!"

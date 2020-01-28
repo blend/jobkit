@@ -12,6 +12,7 @@ import (
 	"github.com/blend/go-sdk/assert"
 	"github.com/blend/go-sdk/bufferutil"
 	"github.com/blend/go-sdk/cron"
+	"github.com/blend/go-sdk/ex"
 	"github.com/blend/go-sdk/r2"
 	"github.com/blend/go-sdk/uuid"
 	"github.com/blend/go-sdk/web"
@@ -52,7 +53,7 @@ func TestManagmentServerGetRequestJobInvocation(t *testing.T) {
 	assert.Nil(err)
 	assert.NotNil(jobScheduler)
 
-	invocation := jobScheduler.Job.(*Job).History[2]
+	invocation := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0]
 	id := invocation.JobInvocation.ID
 
 	r = web.MockCtx("GET", "/job/test2+job.foo/"+id,
@@ -150,7 +151,7 @@ func TestManagementServerJob(t *testing.T) {
 	jobScheduler := firstJob(jm)
 	assert.NotNil(jobScheduler)
 	jobName := jobScheduler.Name()
-	invocationID := jobScheduler.Job.(*Job).History[0].JobInvocation.ID
+	invocationID := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0].ID
 
 	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job/%s", jobName)).Bytes()
 	assert.Nil(err)
@@ -231,13 +232,17 @@ func TestManagementServerJobCancel(t *testing.T) {
 	called := make(chan struct{})
 	cancelled := make(chan struct{})
 
-	job := cron.NewJob(cron.OptJobName("cancel-test"), cron.OptJobAction(func(ctx context.Context) error {
+	job := MustNewJob(cron.NewJob(cron.OptJobName("cancel-test"), cron.OptJobAction(func(ctx context.Context) error {
 		close(called)
 		<-ctx.Done()
 		close(cancelled)
 		return nil
-	}))
+	})))
 	jm.LoadJobs(job)
+
+	js, err := jm.Job("cancel-test")
+	assert.Nil(err)
+	assert.NotNil(js)
 
 	meta, err := web.MockGet(app, fmt.Sprintf("/job.run/%s", job.Name())).Discard()
 	assert.Nil(err)
@@ -257,11 +262,11 @@ func TestManagementServerJobInvocation(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	job := firstJob(jm)
-	assert.NotNil(job)
+	jobScheduler := firstJob(jm)
+	assert.NotNil(jobScheduler)
 
-	jobName := job.Name()
-	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
+	jobName := jobScheduler.Name()
+	invocationID := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0].ID
 
 	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job/%s/%s", jobName, invocationID)).Bytes()
 	assert.Nil(err)
@@ -314,11 +319,12 @@ func TestManagementServerAPIJobsRunning(t *testing.T) {
 	assert := assert.New(t)
 
 	_, app := createTestManagementServer()
-	var jobs []JobInvocation
+	var jobs []JobViewModel
 	meta, err := web.MockGet(app, "/api/jobs.running").JSON(&jobs)
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode)
-	assert.NotEmpty(jobs)
+	assert.Len(jobs, 1)
+	assert.Equal("test0", jobs[0].Name)
 }
 
 func TestManagementServerAPIPause(t *testing.T) {
@@ -401,7 +407,7 @@ func TestManagementServerAPIJobCancel(t *testing.T) {
 	called := make(chan struct{})
 	cancelled := make(chan struct{})
 
-	job := cron.NewJob(
+	job := MustNewJob(cron.NewJob(
 		cron.OptJobName("cancel-test"),
 		cron.OptJobAction(func(ctx context.Context) error {
 			close(called)
@@ -409,7 +415,7 @@ func TestManagementServerAPIJobCancel(t *testing.T) {
 			close(cancelled)
 			return nil
 		}),
-	)
+	))
 	jm.LoadJobs(job)
 
 	meta, err := web.MockPost(app, fmt.Sprintf("/api/job.run/%s", job.Name()), nil).Discard()
@@ -465,11 +471,11 @@ func TestManagementServerAPIJobInvocation(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	job := firstJob(jm)
-	assert.NotNil(job)
+	jobScheduler := firstJob(jm)
+	assert.NotNil(jobScheduler)
 
-	jobName := job.Name()
-	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
+	jobName := jobScheduler.Name()
+	invocationID := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0].ID
 
 	var ji cron.JobInvocation
 	meta, err := web.MockGet(app, fmt.Sprintf("/api/job/%s/%s", jobName, invocationID)).JSON(&ji)
@@ -484,11 +490,11 @@ func TestManagementServerAPIJobOutput(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	job := firstJob(jm)
-	assert.NotNil(job)
+	jobScheduler := firstJob(jm)
+	assert.NotNil(jobScheduler)
 
-	jobName := job.Name()
-	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
+	jobName := jobScheduler.Name()
+	invocationID := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0].ID
 
 	var output struct {
 		ServerTimeNanos int64                    `json:"serverTimeNanos"`
@@ -506,13 +512,12 @@ func TestManagementServerAPIJobOutputAfterNanos(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	job := firstJob(jm)
-	assert.NotNil(job)
+	jobScheduler := firstJob(jm)
+	assert.NotNil(jobScheduler)
 
-	jobName := job.Name()
-	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
-
-	afterNanos := job.Job.(*Job).History[0].JobInvocationOutput.Output.Chunks[2].Timestamp.UnixNano()
+	jobName := jobScheduler.Name()
+	invocationID := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0].ID
+	afterNanos := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0].Output.Chunks[2].Timestamp.UnixNano()
 
 	var output struct {
 		ServerTimeNanos int64                    `json:"serverTimeNanos"`
@@ -534,11 +539,11 @@ func TestManagementServerAPIJobOutputAfterNanosInvalid(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	job := firstJob(jm)
-	assert.NotNil(job)
+	jobScheduler := firstJob(jm)
+	assert.NotNil(jobScheduler)
 
-	jobName := job.Name()
-	invocationID := job.Job.(*Job).History[0].JobInvocation.ID
+	jobName := jobScheduler.Name()
+	invocationID := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0].ID
 
 	var output struct {
 		ServerTimeNanos int64                    `json:"serverTimeNanos"`
@@ -568,7 +573,7 @@ func TestManagementServerAPIJobOutputStreamComplete(t *testing.T) {
 	job, ok := jobScheduler.Job.(*Job)
 	assert.True(ok)
 
-	invocationID := job.History[0].ID
+	invocationID := job.HistoryProvider.(*HistoryMemory).History[0].ID
 	contents, res, err := web.MockGet(app,
 		fmt.Sprintf("/api/job.output.stream/%s/%s", jobName, invocationID),
 		r2.OptQueryValue("afterNanos", "baileydog"),
@@ -594,14 +599,15 @@ func TestManagementServerAPIJobOutputStream(t *testing.T) {
 	ji := jobScheduler.Current
 	invocationID := ji.ID
 
-	res, err := web.MockGet(app,
-		fmt.Sprintf("/api/job.output.stream/%s/%s", jobName, invocationID),
-		r2.OptQueryValue("afterNanos", "baileydog"),
-	).Do()
-
 	start := make(chan struct{})
 	finish := make(chan struct{})
+	errors := make(chan error, 1)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				errors <- ex.New(r)
+			}
+		}()
 		<-start
 		io.WriteString(ji.State.(*JobInvocationOutput).Output, "test1\n")
 		io.WriteString(ji.State.(*JobInvocationOutput).Output, "test2\n")
@@ -618,6 +624,10 @@ func TestManagementServerAPIJobOutputStream(t *testing.T) {
 		jobScheduler.Current = nil
 		jobScheduler.Unlock()
 	}()
+
+	res, err := web.MockGet(app,
+		fmt.Sprintf("/api/job.output.stream/%s/%s", jobName, invocationID),
+	).Do()
 
 	assert.Nil(err)
 	defer res.Body.Close()
@@ -651,6 +661,7 @@ func TestManagementServerAPIJobOutputStream(t *testing.T) {
 		line := scanner.Text()
 		assert.Equal(expected, line)
 	}
+	assert.Empty(errors)
 	close(finish)
 	scanner.Scan()
 	line := scanner.Text()

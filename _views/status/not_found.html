@@ -1,0 +1,9 @@
+{{ define "not_found" }}
+{{ template "header" . }}
+<div id="content" class="uk-container uk-container-expand">
+	<h1>Internal Server Error</h1>
+	<a href="/">Return Home</a>
+	<pre>{{ .ViewModel }}</pre>
+</div>
+{{ template "footer" . }}
+{{ end }}
