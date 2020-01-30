@@ -281,6 +281,9 @@ func (job *Job) OnComplete(ctx context.Context) {
 	if err := job.AddHistoryResult(NewJobInvocation(cron.GetJobInvocation(ctx))); err != nil {
 		job.Error(ctx, err)
 	}
+	if err := job.CullHistory(ctx); err != nil {
+		job.Error(ctx, err)
+	}
 	job.sendStats(ctx, cron.FlagComplete)
 	if job.JobConfig.Notifications.OnCompleteOrDefault() {
 		job.notify(ctx, cron.FlagComplete)
@@ -474,4 +477,15 @@ func (job *Job) AddHistoryResult(ji *JobInvocation) error {
 		return nil
 	}
 	return job.HistoryProvider.Add(ji.Context, ji)
+}
+
+// CullHistory triggers the history provider cull.
+func (job *Job) CullHistory(ctx context.Context) error {
+	if job.JobConfig.HistoryDisabledOrDefault() ||
+		job.JobConfig.HistoryPersistenceDisabledOrDefault() ||
+		job.HistoryProvider == nil {
+		return nil
+	}
+
+	return job.HistoryProvider.Cull(ctx, job.Name(), job.JobConfig.HistoryMaxCountOrDefault(), job.JobConfig.HistoryMaxAgeOrDefault())
 }

@@ -49,12 +49,8 @@ func TestManagmentServerGetRequestJobInvocation(t *testing.T) {
 	assert.NotNil(res)
 	assert.Nil(found)
 
-	jobScheduler, err := jm.Job("test2 job.foo")
-	assert.Nil(err)
-	assert.NotNil(jobScheduler)
-
-	invocation := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0]
-	id := invocation.JobInvocation.ID
+	ji := firstInvocation(jm)
+	id := ji.JobInvocation.ID
 
 	r = web.MockCtx("GET", "/job/test2+job.foo/"+id,
 		web.OptCtxRouteParamValue("jobName", "test2+job.foo"),
@@ -84,7 +80,7 @@ func TestManagementServerIndex(t *testing.T) {
 	contents, meta, err := web.MockGet(app, "/").Bytes()
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode)
-	jobName := firstJob(jm).Name()
+	jobName := firstJobScheduler(jm).Name()
 	assert.Contains(string(contents), fmt.Sprintf("/job/%s", jobName))
 	assert.Contains(string(contents), "Show job stats and history")
 }
@@ -93,7 +89,7 @@ func TestManagementServerSearch(t *testing.T) {
 	assert := assert.New(t)
 
 	jm, app := createTestManagementServer()
-	jobName := firstJob(jm).Name()
+	jobName := firstJobScheduler(jm).Name()
 
 	contents, meta, err := web.MockGet(app, "/search", r2.OptQueryValue("selector", "name="+jobName)).Bytes()
 	assert.Nil(err)
@@ -147,19 +143,16 @@ func TestManagementServerJob(t *testing.T) {
 	assert := assert.New(t)
 
 	jm, app := createTestManagementServer()
+	ji := firstInvocation(jm)
+	invocationID := ji.JobInvocation.ID
 
-	jobScheduler := firstJob(jm)
-	assert.NotNil(jobScheduler)
-	jobName := jobScheduler.Name()
-	invocationID := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0].ID
-
-	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job/%s", jobName)).Bytes()
+	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job/%s", ji.JobName)).Bytes()
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode)
-	assert.Contains(string(contents), jobName)
+	assert.Contains(string(contents), ji.JobName)
 	assert.Contains(string(contents), invocationID)
 
-	assert.Contains(string(contents), fmt.Sprintf("/job/%s", jobName))
+	assert.Contains(string(contents), fmt.Sprintf("/job/%s", ji.JobName))
 	assert.NotContains(string(contents), "Show job stats and history")
 }
 
@@ -262,16 +255,13 @@ func TestManagementServerJobInvocation(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	jobScheduler := firstJob(jm)
-	assert.NotNil(jobScheduler)
+	ji := firstInvocation(jm)
+	invocationID := ji.JobInvocation.ID
 
-	jobName := jobScheduler.Name()
-	invocationID := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0].ID
-
-	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job/%s/%s", jobName, invocationID)).Bytes()
+	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job/%s/%s", ji.JobName, invocationID)).Bytes()
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode, string(contents))
-	assert.Contains(string(contents), jobName)
+	assert.Contains(string(contents), ji.JobName)
 	assert.Contains(string(contents), invocationID)
 }
 
@@ -280,7 +270,7 @@ func TestManagementServerJobInvocationCurrent(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	job := firstJob(jm)
+	job := firstJobScheduler(jm)
 	assert.NotNil(job)
 
 	jobName := job.Name()
@@ -302,7 +292,7 @@ func TestManagementServerJobInvocationNotFound(t *testing.T) {
 	assert.Nil(err)
 	assert.Equal(http.StatusNotFound, meta.StatusCode)
 
-	job := firstJob(jm)
+	job := firstJobScheduler(jm)
 	assert.NotNil(job)
 	jobName := job.Name()
 
@@ -360,7 +350,7 @@ func TestManagementServerAPIJob(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	job := firstJob(jm)
+	job := firstJobScheduler(jm)
 	assert.NotNil(job)
 	jobName := job.Name()
 
@@ -471,17 +461,14 @@ func TestManagementServerAPIJobInvocation(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	jobScheduler := firstJob(jm)
-	assert.NotNil(jobScheduler)
-
-	jobName := jobScheduler.Name()
-	invocationID := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0].ID
+	invocation := firstInvocation(jm)
+	invocationID := invocation.JobInvocation.ID
 
 	var ji cron.JobInvocation
-	meta, err := web.MockGet(app, fmt.Sprintf("/api/job/%s/%s", jobName, invocationID)).JSON(&ji)
+	meta, err := web.MockGet(app, fmt.Sprintf("/api/job/%s/%s", invocation.JobName, invocationID)).JSON(&ji)
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode)
-	assert.Equal(jobName, ji.JobName)
+	assert.Equal(invocation.JobName, ji.JobName)
 	assert.Equal(invocationID, ji.ID)
 }
 
@@ -490,17 +477,14 @@ func TestManagementServerAPIJobOutput(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	jobScheduler := firstJob(jm)
-	assert.NotNil(jobScheduler)
-
-	jobName := jobScheduler.Name()
-	invocationID := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0].ID
+	invocation := firstInvocation(jm)
+	invocationID := invocation.JobInvocation.ID
 
 	var output struct {
 		ServerTimeNanos int64                    `json:"serverTimeNanos"`
 		Chunks          []bufferutil.BufferChunk `json:"chunks"`
 	}
-	meta, err := web.MockGet(app, fmt.Sprintf("/api/job.output/%s/%s", jobName, invocationID)).JSON(&output)
+	meta, err := web.MockGet(app, fmt.Sprintf("/api/job.output/%s/%s", invocation.JobName, invocationID)).JSON(&output)
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode)
 	assert.NotZero(output.ServerTimeNanos)
@@ -512,19 +496,16 @@ func TestManagementServerAPIJobOutputAfterNanos(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	jobScheduler := firstJob(jm)
-	assert.NotNil(jobScheduler)
-
-	jobName := jobScheduler.Name()
-	invocationID := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0].ID
-	afterNanos := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0].Output.Chunks[2].Timestamp.UnixNano()
+	invocation := firstInvocation(jm)
+	invocationID := invocation.JobInvocation.ID
+	afterNanos := invocation.Output.Chunks[2].Timestamp.UnixNano()
 
 	var output struct {
 		ServerTimeNanos int64                    `json:"serverTimeNanos"`
 		Chunks          []bufferutil.BufferChunk `json:"chunks"`
 	}
 	meta, err := web.MockGet(app,
-		fmt.Sprintf("/api/job.output/%s/%s", jobName, invocationID),
+		fmt.Sprintf("/api/job.output/%s/%s", invocation.JobName, invocationID),
 		r2.OptQueryValue("afterNanos", fmt.Sprint(afterNanos)),
 	).JSON(&output)
 
@@ -539,18 +520,15 @@ func TestManagementServerAPIJobOutputAfterNanosInvalid(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	jobScheduler := firstJob(jm)
-	assert.NotNil(jobScheduler)
-
-	jobName := jobScheduler.Name()
-	invocationID := jobScheduler.Job.(*Job).HistoryProvider.(*HistoryMemory).History[0].ID
+	invocation := firstInvocation(jm)
+	invocationID := invocation.JobInvocation.ID
 
 	var output struct {
 		ServerTimeNanos int64                    `json:"serverTimeNanos"`
 		Chunks          []bufferutil.BufferChunk `json:"chunks"`
 	}
 	meta, err := web.MockGet(app,
-		fmt.Sprintf("/api/job.output/%s/%s", jobName, invocationID),
+		fmt.Sprintf("/api/job.output/%s/%s", invocation.JobName, invocationID),
 		r2.OptQueryValue("afterNanos", "baileydog"),
 	).JSON(&output)
 
@@ -565,17 +543,11 @@ func TestManagementServerAPIJobOutputStreamComplete(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	jobScheduler, err := jm.Job("test1")
-	assert.Nil(err)
-	assert.NotNil(jobScheduler)
+	invocation := firstInvocation(jm)
+	invocationID := invocation.JobInvocation.ID
 
-	jobName := jobScheduler.Name()
-	job, ok := jobScheduler.Job.(*Job)
-	assert.True(ok)
-
-	invocationID := job.HistoryProvider.(*HistoryMemory).History[0].ID
 	contents, res, err := web.MockGet(app,
-		fmt.Sprintf("/api/job.output.stream/%s/%s", jobName, invocationID),
+		fmt.Sprintf("/api/job.output.stream/%s/%s", invocation.JobName, invocationID),
 		r2.OptQueryValue("afterNanos", "baileydog"),
 	).Bytes()
 

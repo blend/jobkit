@@ -18,14 +18,6 @@ func createTimestamp(adjustBy time.Duration) time.Time {
 	return time.Date(2019, 10, 01, 12, 11, 10, 9, time.UTC).Add(adjustBy)
 }
 
-func firstJob(jm *cron.JobManager) *cron.JobScheduler {
-	sorted := sortedJobs(jm)
-	if len(sorted) > 0 {
-		return sorted[0]
-	}
-	return nil
-}
-
 // sortedJobs returns the list of jobs ordered by job name.
 func sortedJobs(jm *cron.JobManager) []*cron.JobScheduler {
 	var output []*cron.JobScheduler
@@ -101,14 +93,16 @@ func createTestJobManager() *cron.JobManager {
 	test1inner := cron.NewJob(cron.OptJobName("test1"))
 	test2inner := cron.NewJob(cron.OptJobName("test2 job.foo"))
 
-	test0History := &HistoryMemory{}
+	test0History := new(HistoryMemory)
+	test0History.Initialize(context.TODO())
 	test0History.AddMany(context.TODO(),
 		createTestCompleteJobInvocation("test0", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test0", 250*time.Millisecond),
 		createTestFailedJobInvocation("test0", 5*time.Second, fmt.Errorf("this is only a test %s", uuid.V4().String())),
 	)
 
-	test1History := &HistoryMemory{}
+	test1History := new(HistoryMemory)
+	test1History.Initialize(context.TODO())
 	test1History.AddMany(context.TODO(),
 		createTestCompleteJobInvocation("test1", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test1", 250*time.Millisecond),
@@ -116,7 +110,8 @@ func createTestJobManager() *cron.JobManager {
 		createTestCompleteJobInvocation("test1", 350*time.Millisecond),
 	)
 
-	test2History := &HistoryMemory{}
+	test2History := new(HistoryMemory)
+	test2History.Initialize(context.TODO())
 	test2History.AddMany(context.TODO(),
 		createTestCompleteJobInvocation("test2 job.foo", 200*time.Millisecond),
 		createTestCompleteJobInvocation("test2 job.foo", 250*time.Millisecond),
@@ -137,6 +132,34 @@ func createTestJobManager() *cron.JobManager {
 func createTestManagementServer() (*cron.JobManager, *web.App) {
 	jm := createTestJobManager()
 	return jm, NewServer(jm, Config{})
+}
+
+func firstJobScheduler(jm *cron.JobManager) *cron.JobScheduler {
+	sorted := sortedJobs(jm)
+	if len(sorted) > 0 {
+		return sorted[0]
+	}
+	return nil
+}
+
+func firstInvocation(jm *cron.JobManager) *JobInvocation {
+	for _, js := range jm.Jobs {
+		job, ok := js.Job.(*Job)
+		if !ok {
+			return nil
+		}
+		history, ok := job.HistoryProvider.(*HistoryMemory)
+		if !ok {
+			return nil
+		}
+
+		jis := history.History[js.Name()]
+		if len(jis) == 0 {
+			return nil
+		}
+		return jis[0]
+	}
+	return nil
 }
 
 func TestMain(m *testing.M) {

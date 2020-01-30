@@ -346,7 +346,7 @@ func createJobFromConfig(base config, cfg jobkit.JobConfig, log logger.Log) (*jo
 		jobkit.OptJobConfig(cfg),
 		jobkit.OptJobParsedSchedule(cfg.ScheduleOrDefault()),
 		jobkit.OptJobLog(log),
-		jobkit.OptJobHistory(&jobkit.HistoryMemory{Config: cfg}),
+		jobkit.OptJobHistory(new(jobkit.HistoryMemory)),
 	)
 	if err != nil {
 		return nil, err

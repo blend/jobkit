@@ -48,7 +48,7 @@ func NewJobViewModel(js *cron.JobScheduler) (*JobViewModel, error) {
 	var historyLookup map[string]*JobInvocation
 	if typed.HistoryProvider != nil {
 		var err error
-		history, err = typed.HistoryProvider.Get(context.Background())
+		history, err = typed.HistoryProvider.Get(context.Background(), typed.Name())
 		if err != nil {
 			return nil, err
 		}
