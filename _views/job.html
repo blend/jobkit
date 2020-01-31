@@ -62,14 +62,6 @@
             {{ end }}
         </div>
 		<div class="uk-margin">
-            <span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="history"></span>History Persistence</span>
-            {{ if .ViewModel.Config.HistoryPersistenceDisabledOrDefault }}
-            <h1 class="uk-text-danger">Disabled</h1>
-            {{ else }}
-            <h1 class="uk-text-primary">Enabled</h1>
-            {{ end }}
-        </div>
-		<div class="uk-margin">
             <span class="uk-text-small"><span class="uk-text-primary uk-margin-small-right" uk-icon="history"></span>History Retention</span>
             {{ if .ViewModel.Config.HistoryMaxCountOrDefault }}
             <h1 class="uk-text-primary">{{ .ViewModel.Config.HistoryMaxCountOrDefault }} items</h1>

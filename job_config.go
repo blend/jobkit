@@ -10,17 +10,16 @@ import (
 // from configuration.
 // You can use this job config by embedding it into your larger job config struct.
 type JobConfig struct {
-	cron.JobConfig             `yaml:",inline"`
-	ShellActionConfig          `yaml:",inline"`
-	Name                       string                 `yaml:"name"`
-	Schedule                   string                 `yaml:"schedule"`
-	HistoryPath                string                 `yaml:"historyPath"`
-	HistoryDisabled            *bool                  `yaml:"historyDisabled"`
-	HistoryPersistenceDisabled *bool                  `yaml:"historyPersistenceDisabled"`
-	HistoryMaxAge              *time.Duration         `yaml:"historyMaxAge"`
-	HistoryMaxCount            *int                   `yaml:"historyMaxCount"`
-	Parameters                 []Parameter            `yaml:"parameters"`
-	Notifications              JobNotificationsConfig `yaml:"notifications"`
+	cron.JobConfig    `yaml:",inline"`
+	ShellActionConfig `yaml:",inline"`
+	Name              string                 `yaml:"name"`
+	Schedule          string                 `yaml:"schedule"`
+	HistoryPath       string                 `yaml:"historyPath"`
+	HistoryDisabled   *bool                  `yaml:"historyDisabled"`
+	HistoryMaxAge     *time.Duration         `yaml:"historyMaxAge"`
+	HistoryMaxCount   *int                   `yaml:"historyMaxCount"`
+	Parameters        []Parameter            `yaml:"parameters"`
+	Notifications     JobNotificationsConfig `yaml:"notifications"`
 }
 
 // ScheduleOrDefault returns a value or a default.
@@ -43,14 +42,6 @@ func (jc JobConfig) HistoryPathOrDefault() string {
 func (jc JobConfig) HistoryDisabledOrDefault() bool {
 	if jc.HistoryDisabled != nil {
 		return *jc.HistoryDisabled
-	}
-	return false
-}
-
-// HistoryPersistenceDisabledOrDefault returns a value or a default.
-func (jc JobConfig) HistoryPersistenceDisabledOrDefault() bool {
-	if jc.HistoryPersistenceDisabled != nil {
-		return *jc.HistoryPersistenceDisabled
 	}
 	return false
 }

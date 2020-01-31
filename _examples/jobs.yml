@@ -9,11 +9,20 @@ logger:
 jobs:
   - name: "hello world"
     labels:
+      kind: "static"
+      team: "bailey"
+    schedule: "*/5 * * * * *"
+    historyDisabled: false
+    historyMaxItems: 64
+    exec: [ "echo", "'hello world!'" ]
+
+  - name: "parameters test"
+    labels:
       kind: "parameterized"
       team: "bailey"
     schedule: "*/30 * * * * *"
-    historyEnabled: true
-    historyPersistenceEnabled: false
+    historyDisabled: false
+    historyMaxItems: 32
     parameters:
       - name: "MESSAGE"
         label: "Message"

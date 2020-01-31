@@ -123,12 +123,13 @@ func (job *Job) Schedule() cron.Schedule {
 }
 
 // Config implements job config provider.
+// One specific consideration is it merges the inner job's config parameters with the config parameters
+// found on the wrapping jobkit job config.
 func (job *Job) Config() cron.JobConfig {
 	var cfg cron.JobConfig
 	if typed, ok := job.Job.(cron.ConfigProvider); ok {
 		cfg = typed.Config()
 	}
-	// these will be ultimately merged with the invocation time parameter values.
 	cfg.ParameterValues = cron.MergeJobParameterValues(cfg.ParameterValues, DefaultParameterValues(job.JobConfig.Parameters...))
 	return cfg
 }
@@ -278,7 +279,7 @@ func (job *Job) OnSuccess(ctx context.Context) {
 
 // OnComplete is a lifecycle event handler.
 func (job *Job) OnComplete(ctx context.Context) {
-	if err := job.AddHistoryResult(NewJobInvocation(cron.GetJobInvocation(ctx))); err != nil {
+	if err := job.AddHistoryResult(ctx, NewJobInvocation(cron.GetJobInvocation(ctx))); err != nil {
 		job.Error(ctx, err)
 	}
 	if err := job.CullHistory(ctx); err != nil {
@@ -470,22 +471,19 @@ func (job *Job) notify(ctx context.Context, flag string) {
 //
 
 // AddHistoryResult adds an item to history and culls old items.
-func (job *Job) AddHistoryResult(ji *JobInvocation) error {
+func (job *Job) AddHistoryResult(ctx context.Context, ji *JobInvocation) error {
 	if job.JobConfig.HistoryDisabledOrDefault() ||
-		job.JobConfig.HistoryPersistenceDisabledOrDefault() ||
 		job.HistoryProvider == nil {
 		return nil
 	}
-	return job.HistoryProvider.Add(ji.Context, ji)
+	return job.HistoryProvider.Add(ctx, ji)
 }
 
 // CullHistory triggers the history provider cull.
 func (job *Job) CullHistory(ctx context.Context) error {
 	if job.JobConfig.HistoryDisabledOrDefault() ||
-		job.JobConfig.HistoryPersistenceDisabledOrDefault() ||
 		job.HistoryProvider == nil {
 		return nil
 	}
-
 	return job.HistoryProvider.Cull(ctx, job.Name(), job.JobConfig.HistoryMaxCountOrDefault(), job.JobConfig.HistoryMaxAgeOrDefault())
 }

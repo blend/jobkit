@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
+
+	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/spf13/cobra"
 
@@ -11,6 +15,7 @@ import (
 	"github.com/blend/go-sdk/configutil"
 	"github.com/blend/go-sdk/cron"
 	"github.com/blend/go-sdk/datadog"
+	"github.com/blend/go-sdk/db"
 	"github.com/blend/go-sdk/email"
 	"github.com/blend/go-sdk/env"
 	"github.com/blend/go-sdk/ex"
@@ -26,38 +31,38 @@ import (
 )
 
 var (
-	flagTitle                                *string
-	flagBind                                 *string
-	flagConfigPath                           *string
-	flagDisableServer                        *bool
-	flagUseViewFiles                         *bool
-	flagDefaultJobName                       *string
-	flagDefaultJobExec                       *string
-	flagDefaultJobSchedule                   *string
-	flagDefaultJobHistoryDisabled            *bool
-	flagDefaultJobHistoryPersistenceDisabled *bool
-	flagDefaultJobHistoryPath                *string
-	flagDefaultJobHistoryMaxCount            *int
-	flagDefaultJobHistoryMaxAge              *time.Duration
-	flagDefaultJobTimeout                    *time.Duration
-	flagDefaultJobShutdownGracePeriod        *time.Duration
-	flagDefaultJobLabels                     *[]string
-	flagDefaultJobSkipExpandEnv              *bool
-	flagDefaultJobDiscardOutput              *bool
-	flagDefaultJobHideOutput                 *bool
+	flagTitle                         *string
+	flagBind                          *string
+	flagConfigPath                    *string
+	flagDisableServer                 *bool
+	flagDisablePPRof                  *bool
+	flagUseViewFiles                  *bool
+	flagDefaultJobName                *string
+	flagDefaultJobExec                *string
+	flagDefaultJobSchedule            *string
+	flagDefaultJobHistoryDisabled     *bool
+	flagDefaultJobHistoryPath         *string
+	flagDefaultJobHistoryMaxCount     *int
+	flagDefaultJobHistoryMaxAge       *time.Duration
+	flagDefaultJobTimeout             *time.Duration
+	flagDefaultJobShutdownGracePeriod *time.Duration
+	flagDefaultJobLabels              *[]string
+	flagDefaultJobSkipExpandEnv       *bool
+	flagDefaultJobDiscardOutput       *bool
+	flagDefaultJobHideOutput          *bool
 )
 
 func initFlags(cmd *cobra.Command) {
-	flagTitle = cmd.Flags().String("title", "", "The title for the jobkit instance.")
+	flagTitle = cmd.Flags().String("title", "", "The title for the jobkit instance, typically corresponds to a service.")
 	flagBind = cmd.Flags().String("bind", "", "The management http server bind address.")
-	flagConfigPath = cmd.Flags().StringP("config", "c", "", "The config path.")
+	flagConfigPath = cmd.Flags().StringP("config", "f", "", "The config file path.")
 	flagUseViewFiles = cmd.Flags().Bool("use-view-files", false, "If we should use view files vs. statically linked assets.")
 	flagDisableServer = cmd.Flags().Bool("disable-server", false, "If the management server should be disabled.")
-	flagDefaultJobName = cmd.Flags().StringP("name", "n", "", "The job name (will default to a random string of 8 letters).")
+	flagDisablePPRof = cmd.Flags().Bool("disable-pprof", false, "If the pprof server should be disabled.")
+	flagDefaultJobName = cmd.Flags().StringP("name", "n", "", "The job name (will default to a random string of 8 letters if unset).")
 	flagDefaultJobSchedule = cmd.Flags().StringP("schedule", "s", "", "The job schedule in cron format (ex: '*/5 * * * *')")
 	flagDefaultJobHistoryPath = cmd.Flags().String("history-path", "", "The job history path.")
 	flagDefaultJobHistoryDisabled = cmd.Flags().Bool("history-disabled", jobkit.DefaultHistoryDisabled, "If job history should be tracked in memory.")
-	flagDefaultJobHistoryPersistenceDisabled = cmd.Flags().Bool("history-persistence-disabled", jobkit.DefaultHistoryPersistenceDisabled, "If job history should be saved to disk.")
 	flagDefaultJobHistoryMaxCount = cmd.Flags().Int("history-max-count", 0, "Maximum number of history items to maintain (defaults unbounded).")
 	flagDefaultJobHistoryMaxAge = cmd.Flags().Duration("history-max-age", 0, "Maximum age of history items to maintain (defaults unbounded).")
 	flagDefaultJobTimeout = cmd.Flags().Duration("timeout", 0, "The job execution timeout as a duration (ex: 5s)")
@@ -70,6 +75,7 @@ func initFlags(cmd *cobra.Command) {
 
 type config struct {
 	jobkit.Config `yaml:",inline"`
+	DisablePProf  *bool              `yaml:"disablePProf"`
 	DisableServer *bool              `yaml:"disableServer"`
 	Jobs          []jobkit.JobConfig `yaml:"jobs"`
 }
@@ -109,7 +115,6 @@ func (djc *defaultJobConfig) Resolve() error {
 		configutil.SetString(&djc.Name, configutil.String(*flagDefaultJobName), configutil.String(env.Env().ServiceName()), configutil.String(djc.Name), configutil.String(stringutil.Letters.Random(8))),
 		configutil.SetString(&djc.Schedule, configutil.String(*flagDefaultJobSchedule), configutil.String(djc.Schedule)),
 		configutil.SetBool(&djc.HistoryDisabled, configutil.Bool(flagDefaultJobHistoryDisabled), configutil.Bool(djc.HistoryDisabled), configutil.Bool(ref.Bool(jobkit.DefaultHistoryDisabled))),
-		configutil.SetBool(&djc.HistoryPersistenceDisabled, configutil.Bool(flagDefaultJobHistoryPersistenceDisabled), configutil.Bool(djc.HistoryPersistenceDisabled), configutil.Bool(ref.Bool(jobkit.DefaultHistoryPersistenceDisabled))),
 		configutil.SetString(&djc.HistoryPath, configutil.String(*flagDefaultJobHistoryPath), configutil.String(djc.HistoryPath)),
 		configutil.SetIntPtr(&djc.HistoryMaxCount, configutil.Int(*flagDefaultJobHistoryMaxCount), configutil.Int(jobkit.DefaultHistoryMaxCount)),
 		configutil.SetDurationPtr(&djc.HistoryMaxAge, configutil.Duration(*flagDefaultJobHistoryMaxAge), configutil.Duration(jobkit.DefaultHistoryMaxAge)),
@@ -203,6 +208,16 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	if cfg.DisablePProf == nil || (cfg.DisablePProf != nil && !*cfg.DisablePProf) {
+		// start the pprof server in its own thread.
+		// this allows `go tool pprof <http://localhost:6060> from within the container.
+		go func() {
+			if pprofErr := http.ListenAndServe("127.0.0.1:6060", nil); pprofErr != nil {
+				logger.FatalExit(pprofErr)
+			}
+		}()
+	}
+
 	log, err := logger.New(
 		logger.OptConfig(cfg.Logger),
 		logger.OptPath(cfg.TitleOrDefault()),
@@ -263,12 +278,27 @@ func run(cmd *cobra.Command, args []string) error {
 		log.Infof("adding sentry error collection")
 	}
 
+	conn, err := db.New(db.OptConfigFromEnv())
+	if err != nil {
+		return err
+	}
+	if err := conn.Open(); err != nil {
+		return err
+	}
+
+	historyProvider := &jobkit.HistoryPostgres{
+		Conn: conn,
+	}
+	if err := historyProvider.Initialize(context.Background()); err != nil {
+		return err
+	}
+
 	jobs := cron.New(
 		cron.OptLog(log.WithPath("cron")),
 	)
 
 	for _, jobCfg := range cfg.Jobs {
-		job, err := createJobFromConfig(cfg, jobCfg, jobs.Log)
+		job, err := createJobFromConfig(cfg, jobCfg, jobs.Log, historyProvider)
 		if err != nil {
 			return err
 		}
@@ -280,10 +310,8 @@ func run(cmd *cobra.Command, args []string) error {
 
 		log.Infof("loading job `%s` with exec: %s", jobCfg.Name, ansi.ColorLightWhite.Apply(strings.Join(jobCfg.Exec, " ")))
 		log.Infof("loading job `%s` with schedule: %s", jobCfg.Name, ansi.ColorLightWhite.Apply(jobCfg.ScheduleOrDefault()))
-		if !jobCfg.HistoryDisabledOrDefault() && !jobCfg.HistoryPersistenceDisabledOrDefault() {
-			log.Infof("loading job `%s` with history: enabled and persistence: enabled to output path: %s", jobCfg.Name, jobCfg.HistoryPathOrDefault())
-		} else if !jobCfg.HistoryDisabledOrDefault() {
-			log.Infof("loading job `%s` with history: enabled and persistence: disabled", jobCfg.Name)
+		if !jobCfg.HistoryDisabledOrDefault() {
+			log.Infof("loading job `%s` with history: enabled", jobCfg.Name)
 		} else {
 			log.Infof("loading job `%s` with history: disabled", jobCfg.Name)
 		}
@@ -307,7 +335,7 @@ func run(cmd *cobra.Command, args []string) error {
 	}
 
 	hosted := []graceful.Graceful{jobs}
-	if !*flagDisableServer {
+	if cfg.DisableServer == nil || (cfg.DisableServer != nil && !*cfg.DisableServer) {
 		ws := jobkit.NewServer(jobs, cfg.Config)
 		if cfg.Config.UseViewFilesOrDefault() {
 			log.Debugf("using view files loaded from disk")
@@ -329,7 +357,7 @@ func createDefaultJobConfig(args ...string) (*defaultJobConfig, error) {
 	return cfg, nil
 }
 
-func createJobFromConfig(base config, cfg jobkit.JobConfig, log logger.Log) (*jobkit.Job, error) {
+func createJobFromConfig(base config, cfg jobkit.JobConfig, log logger.Log, historyProvider jobkit.HistoryProvider) (*jobkit.Job, error) {
 	if len(cfg.Exec) == 0 {
 		return nil, ex.New("job exec and command unset", ex.OptMessagef("job: %s", cfg.Name))
 	}
@@ -346,7 +374,7 @@ func createJobFromConfig(base config, cfg jobkit.JobConfig, log logger.Log) (*jo
 		jobkit.OptJobConfig(cfg),
 		jobkit.OptJobParsedSchedule(cfg.ScheduleOrDefault()),
 		jobkit.OptJobLog(log),
-		jobkit.OptJobHistory(new(jobkit.HistoryMemory)),
+		jobkit.OptJobHistory(historyProvider),
 	)
 	if err != nil {
 		return nil, err

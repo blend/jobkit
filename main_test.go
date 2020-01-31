@@ -14,78 +14,93 @@ import (
 	"github.com/blend/go-sdk/web"
 )
 
-func createTimestamp(adjustBy time.Duration) time.Time {
-	return time.Date(2019, 10, 01, 12, 11, 10, 9, time.UTC).Add(adjustBy)
+type jobInvocationOption func(*JobInvocation)
+
+func optJobID(id string) jobInvocationOption {
+	return func(ji *JobInvocation) { ji.ID = id }
 }
 
-// sortedJobs returns the list of jobs ordered by job name.
-func sortedJobs(jm *cron.JobManager) []*cron.JobScheduler {
-	var output []*cron.JobScheduler
-	for _, js := range jm.Jobs {
-		output = append(output, js)
+func optJobName(name string) jobInvocationOption {
+	return func(ji *JobInvocation) { ji.JobName = name }
+}
+
+func optJobStarted(ts time.Time) jobInvocationOption {
+	return func(ji *JobInvocation) { ji.Started = ts }
+}
+
+func optJobComplete(ts time.Time) jobInvocationOption {
+	return func(ji *JobInvocation) { ji.Complete = ts }
+}
+
+func optJobElapsed(elapsed time.Duration) jobInvocationOption {
+	return func(ji *JobInvocation) { ji.Complete = ji.Started.Add(elapsed) }
+}
+
+func optJobStatus(status cron.JobInvocationStatus) jobInvocationOption {
+	return func(ji *JobInvocation) { ji.Status = status }
+}
+
+func optJobErr(err error) jobInvocationOption {
+	return func(ji *JobInvocation) { ji.Err = err }
+}
+
+func optJobParameters(params map[string]string) jobInvocationOption {
+	return func(ji *JobInvocation) { ji.Parameters = params }
+}
+
+func createTestJobInvocation(jobName string, opts ...jobInvocationOption) *JobInvocation {
+	output := &bufferutil.Buffer{
+		Chunks: []bufferutil.BufferChunk{
+			createTestBufferChunk(0),
+			createTestBufferChunk(1),
+			createTestBufferChunk(2),
+			createTestBufferChunk(3),
+			createTestBufferChunk(4),
+		},
 	}
-	sort.Sort(cron.JobSchedulersByJobNameAsc(output))
-	return output
-}
+	outputHandlers := new(bufferutil.BufferHandlers)
+	output.Handler = outputHandlers.Handle
 
-func createTestBufferChunk(index int) bufferutil.BufferChunk {
-	return bufferutil.BufferChunk{
-		Timestamp: createTimestamp(time.Duration(index) * time.Second),
-		Data:      []byte(uuid.V4()),
+	jobInvocationOutput := JobInvocationOutput{
+		Output:         output,
+		OutputHandlers: outputHandlers,
 	}
+	jobInvocation := &cron.JobInvocation{
+		ID:      uuid.V4().String(),
+		JobName: jobName,
+		Started: time.Now().UTC(),
+		Status:  cron.JobInvocationStatusSuccess,
+	}
+	jobInvocation.Context = cron.WithJobInvocation(context.Background(), jobInvocation)
+	jobInvocation.Context = WithJobInvocationOutput(jobInvocation.Context, &jobInvocationOutput)
+
+	ji := &JobInvocation{
+		JobInvocation:       jobInvocation,
+		JobInvocationOutput: jobInvocationOutput,
+	}
+	for _, opt := range opts {
+		opt(ji)
+	}
+	return ji
 }
 
-func createTestCompleteJobInvocation(jobName string, elapsed time.Duration) *JobInvocation {
+func createTestCompleteJobInvocation(jobName string, elapsed time.Duration, opts ...jobInvocationOption) *JobInvocation {
 	ts := time.Now().UTC()
-	output := &JobInvocationOutput{
-		Output: &bufferutil.Buffer{
-			Chunks: []bufferutil.BufferChunk{
-				createTestBufferChunk(0),
-				createTestBufferChunk(1),
-				createTestBufferChunk(2),
-				createTestBufferChunk(3),
-				createTestBufferChunk(4),
-			},
-		},
-	}
-
-	ji := &cron.JobInvocation{
-		ID:       uuid.V4().String(),
-		JobName:  jobName,
-		Started:  ts,
-		Complete: ts.Add(elapsed),
-		Status:   cron.JobInvocationStatusSuccess,
-		State:    output,
-	}
-	ji.Context = cron.WithJobInvocation(context.Background(), ji)
-	ji.Context = WithJobInvocationOutput(ji.Context, output)
-
-	return &JobInvocation{
-		JobInvocation:       ji,
-		JobInvocationOutput: *output,
-	}
+	return createTestJobInvocation(jobName, append([]jobInvocationOption{
+		optJobStarted(ts),
+		optJobComplete(ts.Add(elapsed)),
+		optJobStatus(cron.JobInvocationStatusSuccess),
+	}, opts...)...)
 }
 
-func createTestFailedJobInvocation(jobName string, elapsed time.Duration, err error) *JobInvocation {
+func createTestFailedJobInvocation(jobName string, elapsed time.Duration, err error, opts ...jobInvocationOption) *JobInvocation {
 	ts := time.Now().UTC()
-	return &JobInvocation{
-		JobInvocation: &cron.JobInvocation{
-			ID:       uuid.V4().String(),
-			JobName:  jobName,
-			Started:  ts,
-			Complete: ts.Add(elapsed),
-			Status:   cron.JobInvocationStatusErrored,
-			Err:      err,
-		},
-		JobInvocationOutput: JobInvocationOutput{
-			Output: &bufferutil.Buffer{
-				Chunks: []bufferutil.BufferChunk{
-					createTestBufferChunk(0),
-					createTestBufferChunk(1),
-				},
-			},
-		},
-	}
+	return createTestJobInvocation(jobName, append([]jobInvocationOption{
+		optJobStarted(ts),
+		optJobComplete(ts.Add(elapsed)),
+		optJobStatus(cron.JobInvocationStatusErrored),
+		optJobErr(err),
+	}, opts...)...)
 }
 
 func createTestJobManager() *cron.JobManager {
@@ -160,6 +175,27 @@ func firstInvocation(jm *cron.JobManager) *JobInvocation {
 		return jis[0]
 	}
 	return nil
+}
+
+func createTimestamp(adjustBy time.Duration) time.Time {
+	return time.Date(2019, 10, 01, 12, 11, 10, 9, time.UTC).Add(adjustBy)
+}
+
+// sortedJobs returns the list of jobs ordered by job name.
+func sortedJobs(jm *cron.JobManager) []*cron.JobScheduler {
+	var output []*cron.JobScheduler
+	for _, js := range jm.Jobs {
+		output = append(output, js)
+	}
+	sort.Sort(cron.JobSchedulersByJobNameAsc(output))
+	return output
+}
+
+func createTestBufferChunk(index int) bufferutil.BufferChunk {
+	return bufferutil.BufferChunk{
+		Timestamp: createTimestamp(time.Duration(index) * time.Second),
+		Data:      []byte(uuid.V4().String()),
+	}
 }
 
 func TestMain(m *testing.M) {

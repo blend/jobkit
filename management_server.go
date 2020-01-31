@@ -479,7 +479,7 @@ func (ms ManagementServer) getAPIJobOutputStream(r *web.Ctx) web.Result {
 
 	if !ms.Cron.IsJobRunning(invocation.JobInvocation.JobName) {
 		logger.MaybeDebugf(r.App.Log, "output stream; job is not running, closing")
-		if err := es.EventData("complete", string(invocation.JobInvocation.Status)); err != nil {
+		if err := es.EventData("complete", string(invocation.Status)); err != nil {
 			logger.MaybeError(r.App.Log, err)
 		}
 		return nil
@@ -508,7 +508,7 @@ func (ms ManagementServer) getAPIJobOutputStream(r *web.Ctx) web.Result {
 	if afterNanos, _ := web.Int64Value(r.QueryValue("afterNanos")); afterNanos > 0 {
 		after := time.Unix(0, afterNanos)
 		logger.MaybeDebugf(r.App.Log, "output stream; sending catchup output stream data from: %v", after)
-		for _, chunk := range invocation.JobInvocationOutput.Output.Chunks {
+		for _, chunk := range invocation.Output.Chunks {
 			if chunk.Timestamp.After(after) {
 				sendOutputData(chunk)
 			}
@@ -516,18 +516,18 @@ func (ms ManagementServer) getAPIJobOutputStream(r *web.Ctx) web.Result {
 	}
 
 	logger.MaybeDebugf(r.App.Log, "output stream; listening for new chunks")
-	invocation.JobInvocationOutput.OutputHandlers.Add(listenerID, func(chunk bufferutil.BufferChunk) {
+	invocation.OutputHandlers.Add(listenerID, func(chunk bufferutil.BufferChunk) {
 		sendOutputData(chunk)
 	})
-	defer func() { invocation.JobInvocationOutput.OutputHandlers.Remove(listenerID) }()
+	defer func() { invocation.OutputHandlers.Remove(listenerID) }()
 
 	updateTick := time.Tick(100 * time.Millisecond)
 	for {
 		select {
 		case <-updateTick:
-			if !ms.Cron.IsJobRunning(invocation.JobInvocation.JobName) {
+			if !ms.Cron.IsJobRunning(invocation.JobName) {
 				logger.MaybeDebugf(r.App.Log, "output stream; job invocation is complete, closing")
-				if err := es.EventData("complete", string(invocation.JobInvocation.Status)); err != nil {
+				if err := es.EventData("complete", string(invocation.Status)); err != nil {
 					logger.MaybeError(r.App.Log, err)
 				}
 				return nil
@@ -536,10 +536,13 @@ func (ms ManagementServer) getAPIJobOutputStream(r *web.Ctx) web.Result {
 				logger.MaybeError(r.App.Log, err)
 				return nil
 			}
-			if err := es.EventData("elapsed", fmt.Sprintf("%v", time.Now().UTC().Sub(invocation.JobInvocation.Started).Round(time.Millisecond))); err != nil {
+			if err := es.EventData("elapsed", fmt.Sprintf("%v", time.Now().UTC().Sub(invocation.Started).Round(time.Millisecond))); err != nil {
 				logger.MaybeError(r.App.Log, err)
 				return nil
 			}
+		case <-r.Context().Done():
+			logger.MaybeDebugf(r.App.Log, "output stream; reader exiting on context done")
+			return nil
 		}
 	}
 }
@@ -567,7 +570,7 @@ func (ms ManagementServer) getRequestJob(r *web.Ctx, resultProvider web.ResultPr
 	}
 	jvm, err := NewJobViewModel(jobScheduler)
 	if err != nil {
-		return nil, resultProvider.NotFound()
+		return nil, resultProvider.InternalError(err)
 	}
 	return jvm, nil
 }
