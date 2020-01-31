@@ -287,7 +287,11 @@ func run(cmd *cobra.Command, args []string) error {
 		if err := conn.Open(); err != nil {
 			return err
 		}
-		log.Infof("using postgres history provider: %s@%s/%s", cfg.DB.Username, cfg.DB.HostOrDefault(), cfg.DB.DatabaseOrDefault())
+		if cfg.DB.Username != "" {
+			log.Infof("using sql history provider: %s@%s/%s", cfg.DB.Username, cfg.DB.HostOrDefault(), cfg.DB.DatabaseOrDefault())
+		} else {
+			log.Infof("using sql history provider: %s/%s", cfg.DB.HostOrDefault(), cfg.DB.DatabaseOrDefault())
+		}
 		historyProvider = &jobkit.HistoryPostgres{
 			Conn: conn,
 		}
