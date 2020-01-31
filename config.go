@@ -3,7 +3,9 @@ package jobkit
 import (
 	"github.com/blend/go-sdk/configutil"
 	"github.com/blend/go-sdk/datadog"
+	"github.com/blend/go-sdk/db"
 	"github.com/blend/go-sdk/email"
+	"github.com/blend/go-sdk/env"
 	"github.com/blend/go-sdk/logger"
 	"github.com/blend/go-sdk/sentry"
 	"github.com/blend/go-sdk/slack"
@@ -33,6 +35,8 @@ type Config struct {
 	Slack slack.Config `yaml:"slack"`
 	// Sentry confgures the sentry error collector.
 	Sentry sentry.Config `yaml:"sentry"`
+	// DB controls database connections for the job manager.
+	DB db.Config `yaml:"db"`
 }
 
 // Resolve applies resolution steps to the config.
@@ -44,6 +48,7 @@ func (c *Config) Resolve() error {
 		c.Datadog.Resolve(),
 		c.Slack.Resolve(),
 		c.Sentry.Resolve(),
+		env.Env().ReadInto(&c.DB),
 	)
 }
 

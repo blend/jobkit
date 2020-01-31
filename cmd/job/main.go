@@ -278,19 +278,28 @@ func run(cmd *cobra.Command, args []string) error {
 		log.Infof("adding sentry error collection")
 	}
 
-	conn, err := db.New(db.OptConfigFromEnv())
-	if err != nil {
-		return err
-	}
-	if err := conn.Open(); err != nil {
-		return err
-	}
-
-	historyProvider := &jobkit.HistoryPostgres{
-		Conn: conn,
-	}
-	if err := historyProvider.Initialize(context.Background()); err != nil {
-		return err
+	var historyProvider jobkit.HistoryProvider
+	if !cfg.DB.IsZero() {
+		conn, err := db.New(db.OptConfig(cfg.DB))
+		if err != nil {
+			return err
+		}
+		if err := conn.Open(); err != nil {
+			return err
+		}
+		log.Infof("using postgres history provider: %s@%s/%s", cfg.DB.Username, cfg.DB.HostOrDefault(), cfg.DB.DatabaseOrDefault())
+		historyProvider = &jobkit.HistoryPostgres{
+			Conn: conn,
+		}
+		if err := historyProvider.Initialize(context.Background()); err != nil {
+			return err
+		}
+	} else {
+		log.Infof("using memory history provider")
+		historyProvider = new(jobkit.HistoryMemory)
+		if err := historyProvider.Initialize(context.Background()); err != nil {
+			return err
+		}
 	}
 
 	jobs := cron.New(
