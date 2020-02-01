@@ -288,9 +288,9 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		if cfg.DB.Username != "" {
-			log.Infof("using sql history provider: %s@%s/%s", cfg.DB.Username, cfg.DB.HostOrDefault(), cfg.DB.DatabaseOrDefault())
+			log.Infof("using sql history provider: %s@%s:%s/%s", cfg.DB.Username, cfg.DB.HostOrDefault(), cfg.DB.PortOrDefault(), cfg.DB.DatabaseOrDefault())
 		} else {
-			log.Infof("using sql history provider: %s/%s", cfg.DB.HostOrDefault(), cfg.DB.DatabaseOrDefault())
+			log.Infof("using sql history provider: %s:%s/%s", cfg.DB.HostOrDefault(), cfg.DB.PortOrDefault(), cfg.DB.DatabaseOrDefault())
 		}
 		historyProvider = &jobkit.HistoryPostgres{
 			Conn: conn,

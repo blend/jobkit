@@ -13,8 +13,8 @@ jobs:
       team: "bailey"
     schedule: "*/5 * * * * *"
     historyDisabled: false
-    historyMaxItems: 64
-    exec: [ "echo", "'hello world!'" ]
+    historyMaxCount: 64
+    exec: ["echo", "'hello world!'"]
 
   - name: "parameters test"
     labels:
@@ -22,7 +22,7 @@ jobs:
       team: "bailey"
     schedule: "*/30 * * * * *"
     historyDisabled: false
-    historyMaxItems: 32
+    historyMaxCount: 32
     parameters:
       - name: "MESSAGE"
         label: "Message"

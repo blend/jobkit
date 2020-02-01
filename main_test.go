@@ -70,6 +70,7 @@ func createTestJobInvocation(jobName string, opts ...jobInvocationOption) *JobIn
 		JobName: jobName,
 		Started: time.Now().UTC(),
 		Status:  cron.JobInvocationStatusSuccess,
+		State:   &jobInvocationOutput,
 	}
 	jobInvocation.Context = cron.WithJobInvocation(context.Background(), jobInvocation)
 	jobInvocation.Context = WithJobInvocationOutput(jobInvocation.Context, &jobInvocationOutput)
@@ -159,6 +160,29 @@ func firstJobScheduler(jm *cron.JobManager) *cron.JobScheduler {
 
 func firstInvocation(jm *cron.JobManager) *JobInvocation {
 	for _, js := range jm.Jobs {
+		job, ok := js.Job.(*Job)
+		if !ok {
+			return nil
+		}
+		history, ok := job.HistoryProvider.(*HistoryMemory)
+		if !ok {
+			return nil
+		}
+
+		jis := history.History[js.Name()]
+		if len(jis) == 0 {
+			return nil
+		}
+		return jis[0]
+	}
+	return nil
+}
+
+func firstCompleteInvocation(jm *cron.JobManager) *JobInvocation {
+	for _, js := range jm.Jobs {
+		if js.Current != nil {
+			continue
+		}
 		job, ok := js.Job.(*Job)
 		if !ok {
 			return nil

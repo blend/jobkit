@@ -485,5 +485,6 @@ func (job *Job) CullHistory(ctx context.Context) error {
 		job.HistoryProvider == nil {
 		return nil
 	}
+	logger.MaybeDebugfContext(ctx, job.Log, "culling history: %d items %v age", job.JobConfig.HistoryMaxCountOrDefault(), job.JobConfig.HistoryMaxAgeOrDefault())
 	return job.HistoryProvider.Cull(ctx, job.Name(), job.JobConfig.HistoryMaxCountOrDefault(), job.JobConfig.HistoryMaxAgeOrDefault())
 }

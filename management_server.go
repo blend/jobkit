@@ -146,15 +146,23 @@ func (ms ManagementServer) getStatus(r *web.Ctx) web.Result {
 
 // getStatic is mapped to GET /static/*filepath
 func (ms ManagementServer) getStatic(r *web.Ctx) web.Result {
-	if ms.Config.UseViewFilesOrDefault() {
-		return web.Static(filepath.Join("_static", web.StringValue(r.RouteParam("filepath"))))
-	}
-
 	path, err := r.RouteParam("filepath")
 	if err != nil {
 		web.Text.NotFound()
 	}
 	path = filepath.Join("_static", path)
+
+	if ms.Config.UseViewFilesOrDefault() {
+		r.WithContext(logger.WithLabels(r.Context(), logger.Labels{
+			"web.static_file": path,
+		}))
+		return web.Static(path)
+	}
+
+	r.WithContext(logger.WithLabels(r.Context(), logger.Labels{
+		"web.static_file_cached": path,
+	}))
+
 	file, err := static.GetBinaryAsset(path)
 	if err == os.ErrNotExist {
 		return web.Text.NotFound()
@@ -471,12 +479,15 @@ func (ms ManagementServer) getAPIJobOutputStream(r *web.Ctx) web.Result {
 	if result != nil {
 		return result
 	}
+
+	// set up the event source
 	es := webutil.NewEventSource(r.Response)
 	if err := es.StartSession(); err != nil {
 		logger.MaybeError(r.App.Log, err)
 		return nil
 	}
 
+	// check if the job is running, if not, send the complete event and return
 	if !ms.Cron.IsJobRunning(invocation.JobInvocation.JobName) {
 		logger.MaybeDebugf(r.App.Log, "output stream; job is not running, closing")
 		if err := es.EventData("complete", string(invocation.Status)); err != nil {
@@ -485,6 +496,9 @@ func (ms ManagementServer) getAPIJobOutputStream(r *web.Ctx) web.Result {
 		return nil
 	}
 
+	// this is a helper closure that splits
+	// a chunk into lines, and sends each line individually
+	// because the server events spec is not ideal
 	sendOutputData := func(chunk bufferutil.BufferChunk) {
 		for _, line := range stringutil.SplitLines(string(chunk.Data),
 			stringutil.OptSplitLinesIncludeNewLine(true),
@@ -503,8 +517,7 @@ func (ms ManagementServer) getAPIJobOutputStream(r *web.Ctx) web.Result {
 		}
 	}
 
-	listenerID := uuid.V4().String()
-	// include catchup chunks
+	// if the caller specifies an afterNanos, ship the catchup chunks from an invocation already in flight
 	if afterNanos, _ := web.Int64Value(r.QueryValue("afterNanos")); afterNanos > 0 {
 		after := time.Unix(0, afterNanos)
 		logger.MaybeDebugf(r.App.Log, "output stream; sending catchup output stream data from: %v", after)
@@ -515,32 +528,42 @@ func (ms ManagementServer) getAPIJobOutputStream(r *web.Ctx) web.Result {
 		}
 	}
 
+	// this is the identifier for the streaming session
+	// it won't mean anything after this action returns
+	listenerID := uuid.V4().String()
 	logger.MaybeDebugf(r.App.Log, "output stream; listening for new chunks")
+	// listen for new chunks, this will fire synchronously
 	invocation.OutputHandlers.Add(listenerID, func(chunk bufferutil.BufferChunk) {
 		sendOutputData(chunk)
 	})
+	// unhook on exit
 	defer func() { invocation.OutputHandlers.Remove(listenerID) }()
 
+	// every 100ms, send a heartbeat, if it errors, return
+	// otherwise, listen for the client to have closed, and return
 	updateTick := time.Tick(100 * time.Millisecond)
 	for {
 		select {
 		case <-updateTick:
-			if !ms.Cron.IsJobRunning(invocation.JobName) {
+			if !ms.Cron.IsJobRunning(invocation.JobName) { // if the job isn't running, return
 				logger.MaybeDebugf(r.App.Log, "output stream; job invocation is complete, closing")
 				if err := es.EventData("complete", string(invocation.Status)); err != nil {
 					logger.MaybeError(r.App.Log, err)
 				}
 				return nil
 			}
-			if err := es.Ping(); err != nil {
+			// send a ping, if a browser is listening it
+			// will postpone it closing the connection
+			if err := es.Ping(); err != nil { // if the ping fails, log and return
 				logger.MaybeError(r.App.Log, err)
 				return nil
 			}
+			// send an elapsed time update
 			if err := es.EventData("elapsed", fmt.Sprintf("%v", time.Now().UTC().Sub(invocation.Started).Round(time.Millisecond))); err != nil {
 				logger.MaybeError(r.App.Log, err)
 				return nil
 			}
-		case <-r.Context().Done():
+		case <-r.Context().Done(): // if the context signals done, return
 			logger.MaybeDebugf(r.App.Log, "output stream; reader exiting on context done")
 			return nil
 		}

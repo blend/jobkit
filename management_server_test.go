@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
@@ -40,10 +42,11 @@ func TestManagmentServerGetRequestJobInvocation(t *testing.T) {
 	ms := ManagementServer{
 		Cron: jm,
 	}
+	job := firstJobScheduler(jm)
 
 	// test failure cases ...
-	r := web.MockCtx("GET", "/job/test2+job.foo/",
-		web.OptCtxRouteParamValue("jobName", "test2 job.foo"),
+	r := web.MockCtx("GET", "/job/"+url.QueryEscape(job.Name()),
+		web.OptCtxRouteParamValue("jobName", job.Name()),
 	)
 	found, res := ms.getRequestJobInvocation(r, web.Text)
 	assert.NotNil(res)
@@ -52,14 +55,14 @@ func TestManagmentServerGetRequestJobInvocation(t *testing.T) {
 	ji := firstInvocation(jm)
 	id := ji.JobInvocation.ID
 
-	r = web.MockCtx("GET", "/job/test2+job.foo/"+id,
-		web.OptCtxRouteParamValue("jobName", "test2+job.foo"),
+	r = web.MockCtx("GET", "/job/"+url.QueryEscape(job.Name())+"/"+url.QueryEscape(id),
+		web.OptCtxRouteParamValue("jobName", job.Name()),
 		web.OptCtxRouteParamValue("id", id),
 	)
 	found, res = ms.getRequestJobInvocation(r, web.Text)
 	assert.Nil(res)
 	assert.NotNil(found)
-	assert.Equal("test2 job.foo", found.JobInvocation.JobName)
+	assert.Equal(job.Name(), found.JobInvocation.JobName)
 	assert.Equal(id, found.JobInvocation.ID)
 }
 
@@ -143,16 +146,17 @@ func TestManagementServerJob(t *testing.T) {
 	assert := assert.New(t)
 
 	jm, app := createTestManagementServer()
+
 	ji := firstInvocation(jm)
 	invocationID := ji.JobInvocation.ID
 
 	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job/%s", ji.JobName)).Bytes()
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode)
-	assert.Contains(string(contents), ji.JobName)
-	assert.Contains(string(contents), invocationID)
+	assert.Contains(string(contents), html.EscapeString(ji.JobName))
+	assert.Contains(string(contents), html.EscapeString(invocationID))
 
-	assert.Contains(string(contents), fmt.Sprintf("/job/%s", ji.JobName))
+	assert.Contains(string(contents), fmt.Sprintf("/job/%s", html.EscapeString(ji.JobName)))
 	assert.NotContains(string(contents), "Show job stats and history")
 }
 
@@ -539,16 +543,13 @@ func TestManagementServerAPIJobOutputAfterNanosInvalid(t *testing.T) {
 }
 
 func TestManagementServerAPIJobOutputStreamComplete(t *testing.T) {
-	t.Skip()
 	assert := assert.New(t)
 
 	jm, app := createTestManagementServer()
-
-	invocation := firstInvocation(jm)
-	invocationID := invocation.JobInvocation.ID
+	invocation := firstCompleteInvocation(jm)
 
 	contents, res, err := web.MockGet(app,
-		fmt.Sprintf("/api/job.output.stream/%s/%s", invocation.JobName, invocationID),
+		fmt.Sprintf("/api/job.output.stream/%s/%s", invocation.JobName, invocation.ID),
 		r2.OptQueryValue("afterNanos", "baileydog"),
 	).Bytes()
 
@@ -564,9 +565,7 @@ func TestManagementServerAPIJobOutputStream(t *testing.T) {
 
 	jm, app := createTestManagementServer()
 
-	jobScheduler, err := jm.Job("test0")
-	assert.Nil(err)
-	assert.NotNil(jobScheduler)
+	jobScheduler := firstJobScheduler(jm)
 
 	jobName := jobScheduler.Name()
 	ji := jobScheduler.Current
@@ -575,6 +574,7 @@ func TestManagementServerAPIJobOutputStream(t *testing.T) {
 	start := make(chan struct{})
 	finish := make(chan struct{})
 	errors := make(chan error, 1)
+
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -606,8 +606,10 @@ func TestManagementServerAPIJobOutputStream(t *testing.T) {
 	defer res.Body.Close()
 	assert.Equal(http.StatusOK, res.StatusCode)
 
+	// tell the sidecar to send data
 	close(start)
 
+	// read the body out
 	scanner := bufio.NewScanner(res.Body)
 
 	expectedScript := []string{
