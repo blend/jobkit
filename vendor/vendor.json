@@ -1,0 +1,222 @@
+{
+	"comment": "",
+	"ignore": "test",
+	"package": [
+		{
+			"path": "github.com/DataDog/datadog-go/statsd",
+			"revision": "aa3e05b5449fbfe21a490dadb9f7a974657c542d",
+			"revisionTime": "2020-01-22T15:53:12Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/ansi",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/assert",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/async",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/bufferutil",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/collections",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/configutil",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/cron",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/datadog",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/db",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/db/migration",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/email",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/env",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/ex",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/fileutil",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/graceful",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/jwt",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/logger",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/mathutil",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/r2",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/ref",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/reflectutil",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/selector",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/semver",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/sentry",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/sh",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/slack",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/stats",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/stringutil",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/template",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/timeutil",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/uuid",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/web",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/webutil",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/blend/go-sdk/yaml",
+			"revision": "28d2e5f480dd1ab03be3f923b69258644f37290d",
+			"revisionTime": "2020-02-01T04:47:26Z"
+		},
+		{
+			"path": "github.com/getsentry/sentry-go",
+			"revision": "64e024f37b61555761d98a3e41f43f143127e417",
+			"revisionTime": "2019-07-29T11:14:39Z"
+		},
+		{
+			"path": "github.com/lib/pq",
+			"revision": "9eb73efc1fcc404148b56765b0d3f61d9a5ef8ee",
+			"revisionTime": "2018-10-16T16:26:27Z"
+		},
+		{
+			"path": "github.com/lib/pq/oid",
+			"revision": "9eb73efc1fcc404148b56765b0d3f61d9a5ef8ee",
+			"revisionTime": "2018-10-16T16:26:27Z"
+		},
+		{
+			"path": "github.com/spf13/cobra",
+			"revision": "19cf35ea77e5981f8e8b90a897af621f2be864f6",
+			"revisionTime": "2019-09-17T15:02:42Z"
+		},
+		{
+			"path": "github.com/spf13/pflag",
+			"revision": "2e9d26c8c37aae03e3f9d4e90b7116f5accb7cab",
+			"revisionTime": "2019-09-18T19:59:20Z"
+		},
+		{
+			"path": "golang.org/x/crypto/ssh/terminal",
+			"revision": "f9e2070545dcd4128a854a97ddf10fbfc3c4b6e4",
+			"revisionTime": "2019-09-11T14:47:38Z"
+		},
+		{
+			"path": "golang.org/x/sys/unix",
+			"revision": "b397fe3ad8ed895c98fa54584f61835a88e65ff5",
+			"revisionTime": "2019-10-01T20:21:21Z"
+		},
+		{
+			"path": "golang.org/x/sys/windows",
+			"revision": "b397fe3ad8ed895c98fa54584f61835a88e65ff5",
+			"revisionTime": "2019-10-01T20:21:21Z"
+		}
+	],
+	"rootPath": "github.com/blend/jobkit"
+}
