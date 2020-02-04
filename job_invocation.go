@@ -18,7 +18,7 @@ func NewJobInvocation(ji *cron.JobInvocation) *JobInvocation {
 	invocation := &JobInvocation{
 		JobInvocation: ji.Clone(),
 	}
-	if typed, ok := ji.State.(*JobInvocationOutput); ok && typed != nil {
+	if typed, ok := invocation.State.(*JobInvocationOutput); ok && typed != nil {
 		invocation.JobInvocationOutput = *typed
 	}
 	return invocation
