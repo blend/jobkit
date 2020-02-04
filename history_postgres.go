@@ -67,7 +67,7 @@ func (ji jobInvocationRow) JobInvocation() *JobInvocation {
 	output.Handler = outputHandlers.Handle
 
 	jio := &JobInvocation{
-		JobInvocation: &cron.JobInvocation{
+		JobInvocation: cron.JobInvocation{
 			ID:         ji.ID.String(),
 			JobName:    ji.JobName,
 			Started:    ji.Started,

@@ -18,7 +18,7 @@ func TestNewSlackMessage(t *testing.T) {
 	ts := time.Now()
 	jobName := uuid.V4().String()
 	message := NewSlackMessage(cron.FlagComplete, slack.Message{AsUser: true}, &JobInvocation{
-		JobInvocation: &cron.JobInvocation{
+		JobInvocation: cron.JobInvocation{
 			ID:       id,
 			JobName:  jobName,
 			Status:   cron.JobInvocationStatusSuccess,

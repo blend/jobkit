@@ -73,6 +73,15 @@ func initFlags(cmd *cobra.Command) {
 	flagDefaultJobHideOutput = cmd.Flags().Bool("hide-output", jobkit.DefaultHideOutput, "If jobs should hide console output from the action.")
 }
 
+func main() {
+	cmd := command()
+	initFlags(cmd)
+	cmd.Run = fatalExit(run)
+	if err := cmd.Execute(); err != nil {
+		logger.FatalExit(err)
+	}
+}
+
 type config struct {
 	jobkit.Config `yaml:",inline"`
 	DisablePProf  *bool              `yaml:"disablePProf"`
@@ -141,8 +150,8 @@ job --schedule='*/30 * * * *' -- echo 'hello world'
 # set the job name
 job -n echo --schedule='*/30 * * * *' -- echo 'hello world'
 
-# use a config
-job -c config.yml'
+# use a config file
+job -f config.yml'
 
 # where the config can specify multiple jobs.
 # it can also set general configuration options like the bind address (located in the web config).
@@ -165,57 +174,10 @@ jobs:
 	}
 }
 
-func main() {
-	cmd := command()
-	initFlags(cmd)
-	cmd.Run = fatalExit(run)
-	if err := cmd.Execute(); err != nil {
-		logger.FatalExit(err)
-	}
-}
-
-func fatalExit(action func(*cobra.Command, []string) error) func(*cobra.Command, []string) {
-	return func(parent *cobra.Command, args []string) {
-		if err := action(parent, args); err != nil {
-			logger.FatalExit(err)
-		}
-	}
-}
-
-type configUpdater struct {
-	Log    logger.Log
-	Config *config
-}
-
-func (cu *configUpdater) Start() error {
-	return nil
-}
-
-func (cu *configUpdater) Stop() error {
-	return nil
-}
-
-func (cu *configUpdater) Update() error {
-	if _, err := configutil.Read(cu.Config, configutil.OptPaths(*flagConfigPath)); !configutil.IsIgnored(err) {
-		return err
-	}
-	return nil
-}
-
 func run(cmd *cobra.Command, args []string) error {
 	var cfg config
 	if _, err := configutil.Read(&cfg, configutil.OptPaths(*flagConfigPath)); !configutil.IsIgnored(err) {
 		return err
-	}
-
-	if cfg.DisablePProf == nil || (cfg.DisablePProf != nil && !*cfg.DisablePProf) {
-		// start the pprof server in its own thread.
-		// this allows `go tool pprof <http://localhost:6060> from within the container.
-		go func() {
-			if pprofErr := http.ListenAndServe("127.0.0.1:6060", nil); pprofErr != nil {
-				logger.FatalExit(pprofErr)
-			}
-		}()
 	}
 
 	log, err := logger.New(
@@ -224,6 +186,17 @@ func run(cmd *cobra.Command, args []string) error {
 	)
 	if err != nil {
 		return err
+	}
+
+	if cfg.DisablePProf == nil || (cfg.DisablePProf != nil && !*cfg.DisablePProf) {
+		// start the pprof server in its own thread.
+		// this allows `go tool pprof <http://localhost:6060> from within the container.
+		go func() {
+			log.Infof("pprof server listening on: 127.0.0.1:6060")
+			if pprofErr := http.ListenAndServe("127.0.0.1:6060", nil); pprofErr != nil {
+				logger.FatalExit(pprofErr)
+			}
+		}()
 	}
 
 	log.Debugf("using logger flags: %v", log.Flags.String())
@@ -396,4 +369,12 @@ func createJobFromConfig(base config, cfg jobkit.JobConfig, log logger.Log, hist
 	job.SlackDefaults = cfg.Notifications.Slack
 	job.WebhookDefaults = cfg.Notifications.Webhook
 	return job, nil
+}
+
+func fatalExit(action func(*cobra.Command, []string) error) func(*cobra.Command, []string) {
+	return func(parent *cobra.Command, args []string) {
+		if err := action(parent, args); err != nil {
+			logger.FatalExit(err)
+		}
+	}
 }

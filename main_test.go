@@ -65,14 +65,14 @@ func createTestJobInvocation(jobName string, opts ...jobInvocationOption) *JobIn
 		Output:         output,
 		OutputHandlers: outputHandlers,
 	}
-	jobInvocation := &cron.JobInvocation{
+	jobInvocation := cron.JobInvocation{
 		ID:      uuid.V4().String(),
 		JobName: jobName,
 		Started: time.Now().UTC(),
 		Status:  cron.JobInvocationStatusSuccess,
 		State:   &jobInvocationOutput,
 	}
-	jobInvocation.Context = cron.WithJobInvocation(context.Background(), jobInvocation)
+	jobInvocation.Context = cron.WithJobInvocation(context.Background(), &jobInvocation)
 	jobInvocation.Context = WithJobInvocationOutput(jobInvocation.Context, &jobInvocationOutput)
 
 	ji := &JobInvocation{
@@ -141,7 +141,7 @@ func createTestJobManager() *cron.JobManager {
 
 	jm := cron.New()
 	jm.LoadJobs(test0, test1, test2)
-	jm.Jobs["test0"].Current = createTestCompleteJobInvocation("test0", 200*time.Millisecond).JobInvocation
+	jm.Jobs["test0"].Current = &createTestCompleteJobInvocation("test0", 200*time.Millisecond).JobInvocation
 	return jm
 }
 

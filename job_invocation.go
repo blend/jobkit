@@ -16,7 +16,7 @@ func NewJobInvocation(ji *cron.JobInvocation) *JobInvocation {
 		return nil
 	}
 	invocation := &JobInvocation{
-		JobInvocation: ji,
+		JobInvocation: ji.Clone(),
 	}
 	if typed, ok := ji.State.(*JobInvocationOutput); ok && typed != nil {
 		invocation.JobInvocationOutput = *typed
@@ -31,7 +31,7 @@ var (
 
 // JobInvocation is a serialized form of a job invocation.
 type JobInvocation struct {
-	*cron.JobInvocation
+	cron.JobInvocation
 	JobInvocationOutput
 }
 
@@ -73,11 +73,6 @@ func (ji *JobInvocation) UnmarshalJSON(contents []byte) error {
 	if err := json.Unmarshal(contents, &values); err != nil {
 		return ex.New(err)
 	}
-	// because we embed a pointer
-	// for various reasons
-	// we have to initialize it.
-	ji.JobInvocation = new(cron.JobInvocation)
-
 	ji.ID = values.ID
 	ji.JobName = values.JobName
 	ji.Started = values.Started
