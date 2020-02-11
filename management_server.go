@@ -268,7 +268,7 @@ func (ms ManagementServer) getJobRun(r *web.Ctx) web.Result {
 
 	parameters := job.Config.Parameters
 	parameterValues := ParameterValuesFromForm(parameters, r.Request.Form)
-	ji, err := jobScheduler.RunAsyncContext(cron.WithJobParameterValues(context.Background(), parameterValues))
+	ji, _, err := jobScheduler.RunAsyncContext(cron.WithJobParameterValues(context.Background(), parameterValues))
 	if err != nil {
 		return r.Views.BadRequest(err)
 	}
@@ -394,7 +394,7 @@ func (ms ManagementServer) postAPIJobRun(r *web.Ctx) web.Result {
 			return web.JSON.BadRequest(err)
 		}
 	}
-	ji, err := ms.Cron.RunJobContext(cron.WithJobParameterValues(context.Background(), params), job.Name)
+	ji, _, err := ms.Cron.RunJobContext(cron.WithJobParameterValues(context.Background(), params), job.Name)
 	if err != nil {
 		return web.JSON.BadRequest(err)
 	}

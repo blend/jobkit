@@ -278,7 +278,7 @@ func TestManagementServerJobInvocationCurrent(t *testing.T) {
 	assert.NotNil(job)
 
 	jobName := job.Name()
-	invocationID := job.Current.ID
+	invocationID := job.Current().ID
 
 	contents, meta, err := web.MockGet(app, fmt.Sprintf("/job/%s/current", jobName)).Bytes()
 	assert.Nil(err)
@@ -389,7 +389,6 @@ func TestManagementServerAPIJobRun(t *testing.T) {
 	assert.Nil(err)
 	assert.Equal(http.StatusOK, meta.StatusCode)
 	assert.NotEmpty(ji.ID)
-	assert.False(ji.Started.IsZero())
 	assert.Equal("test1", ji.JobName)
 }
 
@@ -568,7 +567,7 @@ func TestManagementServerAPIJobOutputStream(t *testing.T) {
 	jobScheduler := firstJobScheduler(jm)
 
 	jobName := jobScheduler.Name()
-	ji := jobScheduler.Current
+	ji := jobScheduler.Current()
 	invocationID := ji.ID
 
 	start := make(chan struct{})
@@ -592,10 +591,8 @@ func TestManagementServerAPIJobOutputStream(t *testing.T) {
 		ji.Status = cron.JobInvocationStatusSuccess
 		ji.Complete = time.Now().UTC()
 
-		jobScheduler.Lock()
-		jobScheduler.Last = ji
-		jobScheduler.Current = nil
-		jobScheduler.Unlock()
+		jobScheduler.SetCurrent(nil)
+		jobScheduler.SetLast(ji)
 	}()
 
 	res, err := web.MockGet(app,

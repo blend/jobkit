@@ -72,9 +72,6 @@ func createTestJobInvocation(jobName string, opts ...jobInvocationOption) *JobIn
 		Status:  cron.JobInvocationStatusSuccess,
 		State:   &jobInvocationOutput,
 	}
-	jobInvocation.Context = cron.WithJobInvocation(context.Background(), &jobInvocation)
-	jobInvocation.Context = WithJobInvocationOutput(jobInvocation.Context, &jobInvocationOutput)
-
 	ji := &JobInvocation{
 		JobInvocation:       jobInvocation,
 		JobInvocationOutput: jobInvocationOutput,
@@ -141,7 +138,7 @@ func createTestJobManager() *cron.JobManager {
 
 	jm := cron.New()
 	jm.LoadJobs(test0, test1, test2)
-	jm.Jobs["test0"].Current = &createTestCompleteJobInvocation("test0", 200*time.Millisecond).JobInvocation
+	jm.Jobs["test0"].SetCurrent(&createTestCompleteJobInvocation("test0", 200*time.Millisecond).JobInvocation)
 	return jm
 }
 
@@ -180,7 +177,7 @@ func firstInvocation(jm *cron.JobManager) *JobInvocation {
 
 func firstCompleteInvocation(jm *cron.JobManager) *JobInvocation {
 	for _, js := range jm.Jobs {
-		if js.Current != nil {
+		if js.Current() != nil {
 			continue
 		}
 		job, ok := js.Job.(*Job)

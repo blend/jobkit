@@ -59,6 +59,8 @@ func NewJobViewModel(js *cron.JobScheduler) (*JobViewModel, error) {
 		}
 	}
 
+	current := NewJobInvocation(js.Current())
+	last := NewJobInvocation(js.Last())
 	return &JobViewModel{
 		Name:          typed.Name(),
 		Labels:        js.Labels(),
@@ -67,8 +69,8 @@ func NewJobViewModel(js *cron.JobScheduler) (*JobViewModel, error) {
 		Stats:         HistoryStats(history),
 		Schedule:      typed.JobSchedule,
 		NextRuntime:   js.NextRuntime,
-		Current:       NewJobInvocation(js.Current),
-		Last:          NewJobInvocation(js.Last),
+		Current:       current,
+		Last:          last,
 		History:       history,
 		HistoryLookup: historyLookup,
 	}, nil
