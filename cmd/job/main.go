@@ -89,11 +89,11 @@ type config struct {
 	Jobs          []jobkit.JobConfig `yaml:"jobs"`
 }
 
-func (c *config) Resolve() error {
-	if err := c.Config.Resolve(); err != nil {
+func (c *config) Resolve(ctx context.Context) error {
+	if err := (&c.Config).Resolve(ctx); err != nil {
 		return err
 	}
-	return configutil.AnyError(
+	return configutil.Resolve(ctx,
 		configutil.SetString(&c.Title, configutil.String(*flagTitle), configutil.Env("HOSTNAME"), configutil.String(c.Title)),
 		configutil.SetString(&c.Web.BindAddr, configutil.String(*flagBind), configutil.Env("BIND_ADDR"), configutil.String(c.Web.BindAddr)),
 		configutil.SetBool(&c.DisableServer, configutil.Bool(flagDisableServer), configutil.Bool(c.DisableServer), configutil.Bool(ref.Bool(false))),
@@ -105,7 +105,7 @@ type defaultJobConfig struct {
 	jobkit.JobConfig
 }
 
-func (djc *defaultJobConfig) Resolve() error {
+func (djc *defaultJobConfig) Resolve(ctx context.Context) error {
 	if *flagDefaultJobLabels != nil && len(*flagDefaultJobLabels) > 0 {
 		if djc.Labels == nil {
 			djc.Labels = map[string]string{}
@@ -120,7 +120,7 @@ func (djc *defaultJobConfig) Resolve() error {
 			}
 		}
 	}
-	return configutil.AnyError(
+	return configutil.Resolve(ctx,
 		configutil.SetString(&djc.Name, configutil.String(*flagDefaultJobName), configutil.String(env.Env().ServiceName()), configutil.String(djc.Name), configutil.String(stringutil.Letters.Random(8))),
 		configutil.SetString(&djc.Schedule, configutil.String(*flagDefaultJobSchedule), configutil.String(djc.Schedule)),
 		configutil.SetBool(&djc.HistoryDisabled, configutil.Bool(flagDefaultJobHistoryDisabled), configutil.Bool(djc.HistoryDisabled), configutil.Bool(ref.Bool(jobkit.DefaultHistoryDisabled))),
@@ -176,7 +176,7 @@ jobs:
 
 func run(cmd *cobra.Command, args []string) error {
 	var cfg config
-	if _, err := configutil.Read(&cfg, configutil.OptPaths(*flagConfigPath)); !configutil.IsIgnored(err) {
+	if _, err := configutil.Read(&cfg, configutil.OptAddPreferredFilePaths(*flagConfigPath)); !configutil.IsIgnored(err) {
 		return err
 	}
 
@@ -202,8 +202,10 @@ func run(cmd *cobra.Command, args []string) error {
 	log.Debugf("using logger flags: %v", log.Flags.String())
 	log.Debugf("using logger format: %v", cfg.Logger.FormatOrDefault())
 
+	ctx := context.Background()
+
 	if len(args) > 0 {
-		defaultJobCfg, err := createDefaultJobConfig(args...)
+		defaultJobCfg, err := createDefaultJobConfig(ctx, args...)
 		if err != nil {
 			return err
 		}
@@ -334,9 +336,9 @@ func run(cmd *cobra.Command, args []string) error {
 	return graceful.Shutdown(hosted...)
 }
 
-func createDefaultJobConfig(args ...string) (*defaultJobConfig, error) {
+func createDefaultJobConfig(ctx context.Context, args ...string) (*defaultJobConfig, error) {
 	cfg := new(defaultJobConfig)
-	if err := cfg.Resolve(); err != nil {
+	if err := cfg.Resolve(ctx); err != nil {
 		return nil, err
 	}
 	cfg.Exec = args

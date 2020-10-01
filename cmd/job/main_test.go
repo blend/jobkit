@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/blend/assert/assert"
+	"github.com/blend/go-sdk/assert"
 	"github.com/blend/go-sdk/logger"
 	"github.com/blend/jobkit"
 )

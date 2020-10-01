@@ -1,11 +1,12 @@
 package jobkit
 
 import (
+	"context"
+
 	"github.com/blend/go-sdk/configutil"
 	"github.com/blend/go-sdk/datadog"
 	"github.com/blend/go-sdk/db"
 	"github.com/blend/go-sdk/email"
-	"github.com/blend/go-sdk/env"
 	"github.com/blend/go-sdk/logger"
 	"github.com/blend/go-sdk/sentry"
 	"github.com/blend/go-sdk/slack"
@@ -40,15 +41,14 @@ type Config struct {
 }
 
 // Resolve applies resolution steps to the config.
-func (c *Config) Resolve() error {
-	return configutil.AnyError(
-		c.Logger.Resolve(),
-		c.Web.Resolve(),
-		c.EmailDefaults.Resolve(),
-		c.Datadog.Resolve(),
-		c.Slack.Resolve(),
-		c.Sentry.Resolve(),
-		env.Env().ReadInto(&c.DB),
+func (c *Config) Resolve(ctx context.Context) error {
+	return configutil.Resolve(ctx,
+		(&c.Logger).Resolve,
+		(&c.DB).Resolve,
+		(&c.Web).Resolve,
+		(&c.Datadog).Resolve,
+		(&c.Slack).Resolve,
+		(&c.Sentry).Resolve,
 	)
 }
 
